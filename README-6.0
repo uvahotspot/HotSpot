@@ -1,6 +1,6 @@
 HotSpot-6.0 Changes
 -------------------
-Contact: Runjie Zhang, runjie@virginia.edu
+Contact: Robert West, rew7y@virginia.edu
 
 The changes documented in this release are partly sponsored by 
 Defense Advanced Research Projects Agency(DARPA), Microsystems Technology Office (MTO),
@@ -26,9 +26,7 @@ http://crd-legacy.lbl.gov/~xiaoye/SuperLU/
 How to Use :
 -----------
 a. Download and build SuplerLU.
-   SuperLU requires BLAS (Basic Linear Algebra Subprograms) library.
-   If libblas is not installed, here is a quick guide on how to
-   build one: http://www.giammy.com/phd/blas-lapack-howto.html
+   Note that SuperLU requires BLAS (Basic Linear Algebra Subprograms) library.
 b. Modify Makefile parameter SuperLUroot 
    SuperLUroot = /path/to/your/build
 c. Build HotSpot with option SUPERLU=1

@@ -19,15 +19,11 @@ CONTENTS
 
 INSTALLATION
 ------------
-1. Download the HotSpot tar ball (HotSpot-6.0.tar.gz) following the
-instructions at http://lava.cs.virginia.edu/HotSpot
-
-2. Unzip and untar the file using the following commands
-    a) gunzip HotSpot-6.0.tar.gz
-    b) tar -xvf HotSpot-6.0.tar
+1. Download HotSpot from GitHub using the following command:
+    a) git clone https://github.com/uvahotspot/hotspot.git
 
 3. Go to the HotSpot installation directory
-    a) cd HotSpot-6.0/
+    a) cd hotspot/
     
 4. For Linux/UNIX systems with BLAS/LAPACK libraries installed, 
 uncomment the lines corresponding to your installation of the
@@ -61,11 +57,7 @@ useful as it provides useful description of the C interface to BLAS.
     version of ACML available is 3.1.0. On such machines, the ACML
     library works with GCC 4.0 but not with GCC 4.1.
     b) Linking with Sun Performance Library on old Solaris machines
-    fails as 'libmtsk' was not found.  (e.g. see
-    http://supportforum.sun.com/jive/thread.jspa?threadID=72529)
-    Installing patch 117560 from Sun's patch finder
-    (http://sunsolve.sun.com/pub-cgi/show.pl?target=patches/patch-access)
-    solves the problem.
+    fails as 'libmtsk' was not found.
 
 QUICK USAGE GUIDE FOR THE TOOLS
 -------------------------------
@@ -344,9 +336,7 @@ http://crd-legacy.lbl.gov/~xiaoye/SuperLU/
 How to Use :
 -----------
 a. Download and build SuplerLU.
-   SuperLU requires BLAS (Basic Linear Algebra Subprograms) library.
-   If libblas is not installed, here is a quick guide on how to
-   build one: http://www.giammy.com/phd/blas-lapack-howto.html
+   Note that SuperLU requires BLAS (Basic Linear Algebra Subprograms) library.
 b. Modify Makefile parameter SuperLUroot 
    SuperLUroot = /path/to/your/build/SuperLU_4.3
 c. Build HotSpot with option SUPERLU=1
@@ -563,6 +553,6 @@ Particularly, the 'Makefile', sample input data files
 running the binaries/scripts without any command line switches gives a 
 detailed listing of the available options. In case of further questions, 
 please send e-mail to the HotSpot user group at the address "hotspot AT
-cs.virginia.edu". To subscribe to the list, please visit
-http://www.cs.virginia.edu/mailman/listinfo/hotspot.
+virginia.edu". To subscribe to the list, please visit
+https://lists.virginia.edu/sympa/info/hotspot.
 
