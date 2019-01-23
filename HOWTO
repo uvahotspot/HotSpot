@@ -1,0 +1,568 @@
+CONTENTS
+--------
+    A) Installation
+    B) Quick usage guide for the tools
+        1) Base case - the block level thermal model
+        2) The grid model
+        3) The HotFloorplan floorplanner
+        4) The package model
+        5) The secondary heat transfer path
+        6) The leakage mode 
+    C) More detailed guidelines
+        1) The block model - aspect ratio
+        2) The grid model - 3-D stacking capability
+        3) Model layers with heterogeneous materials
+        4) Speedup steady-state simulations with SuperLU
+        5) Source-level integration with a power/performance simulator
+        6) HotFloorplan
+    D) Conclusion    
+
+INSTALLATION
+------------
+1. Download the HotSpot tar ball (HotSpot-6.0.tar.gz) following the
+instructions at http://lava.cs.virginia.edu/HotSpot
+
+2. Unzip and untar the file using the following commands
+    a) gunzip HotSpot-6.0.tar.gz
+    b) tar -xvf HotSpot-6.0.tar
+
+3. Go to the HotSpot installation directory
+    a) cd HotSpot-6.0/
+    
+4. For Linux/UNIX systems with BLAS/LAPACK libraries installed, 
+uncomment the lines corresponding to your installation of the
+BLAS/LAPACK vendor libraries (see http://www.netlib.org/blas/faq.html#5) 
+and set the path and compiler options corresponding to your library. 
+This version of HotSpot has code integrated for Intel Math Kernel Library, 
+AMD Core Math Library, Apple Velocity Engine and Sun Performance Library.
+Extending it to other vendors should be straightforward. For such an extension,
+apart from the user guide from those vendors,
+http://www.netlib.org/blas/blast-forum/cinterface.pdf might also be
+useful as it provides useful description of the C interface to BLAS.
+
+5. Build HotSpot
+	a) Under Linux/UNIX systems with GNU Make and GCC, type the 
+	following for compilation:
+    > make
+  	
+    b) To remove all the outputs of compilation, type 'make clean'.
+    Similarly, to remove the object files alone, type 'make cleano'.
+    To view the list of files HotSpot needs for proper working, type 
+    'make filelist'. To compile for debugging, use 'make DEBUG=1'. 
+    Under a Linux/UNIX system, to compile for using with a profiler 
+    (e.g. gprof), use 'make DEBUG=2'.
+
+    c) In principle, HotSpot could be build on any major platform 
+    since it is implemented in standard C. For detailed installation
+    instructions for other platforms, please contact the authors.
+
+6. Known compatibility issues:
+    a) For old AMD machines without SSE2 instructions, the most recent
+    version of ACML available is 3.1.0. On such machines, the ACML
+    library works with GCC 4.0 but not with GCC 4.1.
+    b) Linking with Sun Performance Library on old Solaris machines
+    fails as 'libmtsk' was not found.  (e.g. see
+    http://supportforum.sun.com/jive/thread.jspa?threadID=72529)
+    Installing patch 117560 from Sun's patch finder
+    (http://sunsolve.sun.com/pub-cgi/show.pl?target=patches/patch-access)
+    solves the problem.
+
+QUICK USAGE GUIDE FOR THE TOOLS
+-------------------------------
+1. Base case - the block level thermal model:
+
+The thermal model is bundled as a trace-level simulator that takes a
+power trace file and a floorplan file as inputs and outputs the
+corresponding transient temperatures onto a temperature trace file.
+There is also an option to output the final steady state temperatures
+onto a file. The formats of the input files can be gleaned from the
+sample files included with this distribution. For instance, with
+'ev6.flp' as the given floorplan, 'gcc.ptrace' as the given power
+trace file, the set of commands to generate the temperature trace file
+'gcc.ttrace' are given below. First, let us run the simulations with a
+set of default model parameters listed in the file 'hotspot.config'
+and gather the steady state temperatures onto a file. This is done by:
+a) hotspot -c hotspot.config -f ev6.flp -p gcc.ptrace \
+           -o gcc.ttrace -steady_file gcc.steady
+
+Now, 'gcc.ttrace' does contain a thermal trace but the initial
+temperatures that were used to generate it were default constant
+values. These might not be representative if the simulation is not
+long enough to warm up the chip and package. However, the steady state
+temperatures are a good estimate of what the correct set of initial
+temperatures are.  So, we now use the steady state temperatures
+produced as the set of initial temperatures for the next 'true' run:
+b) cp gcc.steady gcc.init
+   hotspot -c hotspot.config -init_file gcc.init -f ev6.flp \
+           -p gcc.ptrace -o gcc.ttrace
+
+Note that the '-o <file>' command line flag is optional. Omitting it
+makes HotSpot compute the steady state temperatures directly without
+going through the transient simulation, thereby making the run faster.
+So, in the above command a), since we are interested only in the
+steady state temperatures, we could have actually omitted the '-o
+gcc.ttrace' part. Also, in the command b) above, note that we have
+omitted the '-steady_file <file>' option. This means that the steady
+state temperatures are only output to the screen and not to a file.
+
+2. The grid model:
+
+The above runs used the default, fast but less accurate 'block'
+thermal model. HotSpot offers the choice of another more accurate but
+relatively slower model called the 'grid' model. The '-model_type
+grid' command line option switches HotSpot to the grid mode. Hence,
+the set of commands to  redo the two-pass thermal simulations above
+using the grid model would be:
+a) hotspot -c hotspot.config -f ev6.flp -p gcc.ptrace \
+           -steady_file gcc.steady -model_type grid 
+b) cp gcc.steady gcc.init
+   hotspot -c hotspot.config -init_file gcc.init -f ev6.flp \
+           -p gcc.ptrace -o gcc.ttrace -model_type grid 
+
+The trade-off between speed and accuracy of the grid model can be
+controlled by specifying the grid model's resolution through the
+command line options '-grid_rows <num>' and '-grid_cols <num>'. The
+default grid size is 64x64 (as can be seen from the 'hotspot.config'
+file). Grid dimensions are restricted to powers of two for algorithmic
+convenience. 
+
+In addition to the '-steady_file <file>' option that provides
+temperatures at a per-block granularity, the grid model provides an
+additional means to access the finer grid of steady state
+temperatures. The command line option '-grid_steady_file <file>'
+outputs the internal grid temperatures directly (without 
+aggregating them into per-block temperatures). This can help in 
+learning how temperatures vary 'within' a block. Also, the perl script
+'grid_thermal_map.pl' can produce an SVG format color image of these
+temperatures with a superposed drawing of the floorplan for easy
+viewing. If native viewer programs (e.g.: Adobe SVG viewer) are not
+available for viewing an SVG file, conversion tools like 'ImageMagick
+convert' can be used to generate alternate formats. Below is the set
+of commands to output grid temperatures onto a file called
+'gcc.grid.steady' and then to output the thermal map as a PDF image
+using 'convert':
+c) hotspot -c hotspot.config -f ev6.flp -p gcc.ptrace \
+           -steady_file gcc.steady -model_type grid \
+           -grid_steady_file gcc.grid.steady 
+   grid_thermal_map.pl ev6.flp gcc.grid.steady > gcc.svg
+   convert -font Helvetica svg:gcc.svg gcc.pdf
+
+Since the grid model aggregates the finer grid temperatures into
+per-block temperatures, HotSpot provides a choice to the user in the
+mode of aggregation. The user can select the mapping between the grid
+and block temperatures of the grid model through the command line
+option '-grid_map_mode <mode>'. The four mapping modes supported are:
+'min', 'max', 'avg' and 'center'. The first three options respectively
+mean that the block's temperature is computed as the minimum, maximum,
+or average temperature of the grid cells in it. The 'center' option
+means that the block's temperature is given by the temperature of the
+grid cell at its center.
+
+3. The HotFloorplan Floorplanner:
+
+HotSpot comes with a thermal-aware floorplanning tool that can be
+easily configured to optimize for an arbitrary objective function. It
+takes a listing of the functional block names, areas, allowable aspect
+ratios and the connectivity between the blocks as its input from a
+file. 'ev6.desc' is such a 'floorplan description' file (as opposed to
+the 'floorplan file' ev6.flp). In order to evaluate the generated
+floorplans for thermal merit, HotFloorplan also needs a set of average
+power values for each of the functional blocks.  This is also
+specified in a file (e.g.: 'avg.p'). With these files as inputs, the
+command to run HotFloorplan to produce an output file 'output.flp'
+containing the floorplan generated is given by:
+a) hotfloorplan -c hotspot.config -f ev6.desc -p avg.p \
+                -o output.flp
+
+Please note that with default configuration, this typically takes
+about 45 minutes to complete on a 2 GHz Athlon. The thermal model
+defaults for HotFloorplan are the same as HotSpot. Also note that all
+the thermal model command line options can be specified here too. Note
+that if the grid model is chosen using the '-model_type grid' option,
+it might be too slow for any useful progress. The floorplan generated
+(or any other .flp file for that matter) can be viewed using a FIG
+file viewer like 'XFig' and the perl script 'tofig.pl' which converts
+it into the FIG format. Alternatively, the command to convert this
+'output.flp' into PDF using fig2dev and ps2pdf is:
+b) tofig.pl output.flp  | fig2dev -L ps | ps2pdf - output.pdf
+
+4. The package model:
+
+HotSpot integrates a simple model for heatsink, air flow and fan. This
+can assist cooling package design and exploration of the impact of 
+cooling configurations on silicon temperatures. The package model also
+supports natural convection (which results in a much higher thermal
+resistance, and can cause thermal runaway for high-power chips). By 
+default, HotSpot uses a single lumped thermal convection resistance 
+(r_convec) at the air-sink interface. This should be adequate in most 
+cases, unless factors such as the heatsink shape, air flow speed, fan 
+diameter etc are the design variables. Detailed package configuration 
+is provided in a file (e.g. 'package.config'). An example of using the 
+package model is given by:
+a) hotspot -c hotspot.config -f ev6.flp -p gcc.ptrace \
+					 -package_model_used 1
+
+5. The secondary heat transfer path:
+
+HotSpot also models the secondary heat transfer path from the silicon 
+to on-chip interconnect layers, C4 pads, packaging substrate, solder 
+balls and printed-circuit board. In most cases when there is a heatsink 
+with forced air-convection, the effect of secondary heat transfer path 
+can be neglected. For special cases such as exposing silicon die to an 
+oil flow for infrared thermal measurements, secondary heat transfer
+path should not be omitted (see 'oil_bare_silicon.config'). This feature 
+is only available with the grid model. Here is an example of how to enable 
+the secondary path:
+a) hotspot -c hotspot.config -f ev6.flp -p gcc.ptrace \
+					 -model_secondary 1 -model_type grid
+					 
+6. The leakage mode:
+
+HotSpot also provides a simple interface for leakage model. Modeling 
+leakage is sometimes critical since it is exponentially dependent on 
+temperature. The leakage model in implemented in 'calc_leakage()' in 
+'temperature.c'. Users can replace it with their own model, as long as
+the calling interface remains the same. This is only supported for 
+steady-state simulations. Transient thermal-leakage loop is NOT 
+supported, because the time scales of transient leakage power evolvement 
+are not clear, and it is potentially wrong to assume instantaneous 
+leakage update with increased temperature in each transient step 
+('sampling interval') in HotSpot. To enable the leakage calculations:
+a) hotspot -c hotspot.config -f ev6.flp -p gcc.ptrace -leakage_used 1 
+
+MORE DETAILED GUIDELINES
+------------------------
+1. The block model - aspect ratio:
+
+Since the block model approximates the temperature of an entire
+functional block with a single node, it could potentially suffer from
+spatial discretization errors when the modeled blocks have very high
+aspect ratios.  In such cases, the user should either use the grid
+model or the floorplan should be modified in such a manner that the
+blocks are sub-divided into square-shaped sub-blocks. To aid in this
+aspect ratio sub-division, HotSpot provides two wrapper scripts:
+'hsconvert-flp.pl' and 'hsconvert-data.pl'.  The former can be  used
+to convert floorplans with high-aspect-ratio blocks while the latter
+can be used to migrate the corresponding power/temperature trace data
+from the old floorplan to the new floorplan. Here is a sample use
+where 'ev6.flp.orig' is the old floorplan and the power trace
+corresponding to it is 'gcc.ptrace.orig'. The following sequence of
+commands produces a floorplan file ('ev6.flp') with nearly
+square-shaped blocks and a compatible power trace file ('gcc.ptrace'):
+a) hsconvert-flp.pl ev6.flp.orig > ev6.flp
+   hsconvert-data.pl -o ev6.flp.orig -c ev6.flp \
+                     -p gcc.ptrace.orig > gcc.ptrace
+
+It is to be noted that being a finite-element solver, HotSpot cannot
+avoid discretization errors altogether. However, they can be dealt
+with effectively as a speed vs. accuracy trade-off. For instance, in
+cases where higher accuracy is desired, the grid model could be used.
+It is to be noted that even with the grid model, high aspect ratios
+can be a problem. A common pitfall is using an extremely fine mesh in
+the x-y direction without correspondingly increasing the resolution in
+the z direction. For instance, if one must use a 1024 x 1024 grid,
+then the no. of z-layers should also be increased using the layer
+configuration file specification (described below in the next section
+on 3-D stacking) so that each volumetric cell is still nearly
+'cubical' and not 'tall and skinny'. 
+
+2. The grid model - 3-D stacking capability:
+
+HotSpot's grid model is capable of modeling stacked 3-D chips. To be
+able to do that, one has to specify what is called the 'Layer
+Configuration File' (LCF). An LCF specifies the set of vertical layers
+to be modeled including its physical properties (thickness,
+conductivity etc.) and the floorplan of the die in that layer. For
+instance, the sample file 'layer.lcf' shows an LCF corresponding
+to the default HotSpot configuration with two layers: one layer of
+silicon and one layer of Thermal Interface Material (TIM). An LCF is
+input using the command line option "-grid_layer_file <file>".
+
+Let us now look at an example of how to model stacked 3-D chips. Let
+us use a simple, 3-block floorplan file 'example.flp' in addition to
+the original 'ev6.flp.orig'. In the chip we will model, layer 0 is
+power dissipating silicon with a floorplan of 'example.flp', followed
+by a layer of non-dissipating (passive) TIM. This is then followed by
+another layer of active silicon with a floorplan of 'ev6.flp.orig' and
+another layer of passive TIM. Such a layer configuration is described
+in 'example.lcf'. Also, we will just do a single-pass simulation
+staring with the default constant initial temperature values. So, we
+will ignore the '-steady_file <file>' option. The command to do this
+is:
+a) hotspot -c hotspot.config -f <some_random_file> -p example.ptrace \
+           -o example.ttrace -model_type grid \
+           -grid_layer_file example.lcf
+
+Note that the floorplan files of the layers are all specified only
+through the LCF. The file specified through '-f <flp_file>' command
+line option is overridden by the LCF, as indicated by the warning
+message printed while running HotSpot. It is now worth taking a moment
+to look at the power trace file 'example.ptrace' and comparing it with
+'gcc.ptrace.orig'. 
+
+3. Model layers with heterogeneous materials
+
+The modeling of a 2-D chip's C4 pad array or a 3-D chip's thermal vias 
+requires support for heterogeneous materials within one layer.
+Thanks to Prof. Ayse Coskun's research team in Boston University,
+this feature is now supported by HotSpot (starting from version 6.0).
+
+To enable this new feature in simulation, cmd line option 'detailed_3D' 
+should be set to 'on'. Currently, heterogeneous layers could only be modeled 
+in grid-mode with .lcf file specified. There is a slight change in the format 
+of the floorplan file (.flp) that allows units in the floorplan to have different 
+heat capacitance and resistivity (see the example below). Note that specific-heat 
+and resistivity are optional. Leaving them blank will force HotSpot to use layers'
+default RC values (specified in .lcf file) for that block. 
+
+#Format: <unit-name> <width> <height> <left-x> <bottom-y> [<specific-heat>] [<resistivity>]
+Unit1	0.002000	0.002000	0.000000	0.000000	4e6	.02294
+
+How to Run :
+-----------
+Get steady-state temperature map:
+>> ./hotspot -c hotspot.config -f <filename> -p <powerfile> -steady_file <steadyfile> \
+			 -model_type grid -detailed_3D on -grid_layer_file <lcffile> 
+
+Transient simulation with steady-state results as initial temperature:
+>> ./hotspot -c hotspot.config -init_file <steadyfile> -f <filename> -p <powerfile> \
+			 -o <ttracefile> -model_type grid -detailed_3D on -grid_layer_file <lcffile>
+
+Notice that since .lcf is provided, the .flp file specified by -f option will be overridden.
+
+Also, you can find a more detailed example in subdirectory 3D_testcase. This test suite is
+created by Prof. Coskun's team in BU.
+
+4. Speedup steady-state simulations with SuperLU
+
+Starting from version 6.0, HotSpot provides an option to speedup grid-mode's steady-state 
+simulations with direct solver. This solver is built on SuperLU, an open source library for 
+the direct solution of large, sparse systems of linear equations. Documentations, 
+installation instructions and source code can be found here: 
+http://crd-legacy.lbl.gov/~xiaoye/SuperLU/
+
+How to Use :
+-----------
+a. Download and build SuplerLU.
+   SuperLU requires BLAS (Basic Linear Algebra Subprograms) library.
+   If libblas is not installed, here is a quick guide on how to
+   build one: http://www.giammy.com/phd/blas-lapack-howto.html
+b. Modify Makefile parameter SuperLUroot 
+   SuperLUroot = /path/to/your/build/SuperLU_4.3
+c. Build HotSpot with option SUPERLU=1
+   >> make clean
+   >> make SUPERLU=1
+d. Run HotSpot simulation. (Input and output files are same as before)
+
+According to our internal tests, this new direct solver could be 10x-100x faster than 
+the iterative solver used by previous versions of HotSpot. However, due to its large 
+memory usage, direct solver will significantly slowdown when the problem size 
+(grid-size, number of layers in a 3D chip) is large. For this reason, we recommend 
+using direct solver in these two situations:
+a. When grid size is relatively small. (e.g. no larger than 256x256 for a 4-layer 3D chip).
+   If the host machine's memory is small (<8GB), even smaller grid-size is preferred.
+b. When detailed_3D mode is enabled.
+
+5. Source-level integration with a power/performance simulator:
+        
+To assist in the easier integration of HotSpot into the user's
+existing codebase, HotSpot bundles its functions into a library -
+'libhotspot.a'. A minimal 'no-frills' version of the most important
+datatypes and function prototypes are separately declared in
+'hotspot-iface.h'. A user should be able to integrate HotSpot very
+quickly by just including this header file and linking the existing
+codebase with 'libhotspot.a'. However, for a more complete utilization
+of HotSpot's capabilities, one might want to integrate its source
+files more tightly. In order to illustrate such an integration of
+HotSpot with a power/performance simulator like Simplescalar/Wattch,
+the HotSpot distribution comes with a simulator template file
+'sim-template.c'. The file contains detailed description and comments
+about the HotSpot datatypes and function calls. It contains three
+functions: 'sim_init', 'sim_main' and 'sim_exit' that clearly
+illustrate the initialization, usage and clean-up of state
+respectively when using HotSpot with another simulator. A shorter code
+snippet that demonstrates the high-level use of HotSpot in the user's
+code is shown below:
+
+#include "flp.h"
+#include "temperature.h"
+
+int main() 
+{
+
+    char *flp_file, *power_file;
+    char *init_temp_file, *steady_temp_file;
+
+    flp_t *flp;
+    RC_model_t *model;
+    thermal_config_t config;
+    double *power, *temp;
+    /* transient simulation for 1 ms    */
+    double delta_t = 0.001;
+
+    flp = read_flp(flp_file, FALSE);
+    config = default_thermal_config();
+    model = alloc_RC_model(&config, flp);
+    temp = hotspot_vector(model);
+    power = hotspot_vector(model);
+
+    read_power(model, power, power_file);
+    read_temp(model, temp, init_temp_file, FALSE);
+
+    populate_R_model(model, flp);
+    populate_C_model(model, flp);
+
+    /* transient solver    */
+    compute_temp(model, power, temp, delta_t);
+    /* steady state solver    */
+    steady_state_temp(model, power, temp);
+
+    dump_temp(model, temp, steady_temp_file);
+
+    delete_RC_model(model);
+    free_flp(flp, FALSE);
+    free_dvector(temp);
+    free_dvector(power);
+
+    return 0;
+}
+
+A note about the transient temperature calls to the grid model: before
+solving for transient temperature, the grid model maps the functional
+block power and temperature numbers onto each grid cell. After the
+solution is done, the temperature numbers are mapped back onto each
+functional block. This reverse mapping involves averaging. When the
+transient solver is called repeatedly (as is usually the case), and if
+the internal state of the solver is not maintained across calls, this
+averaging can result in some loss of accuracy. To avoid that, HotSpot
+provides an option to maintain state across calls to the transient
+solver of the grid model. When the solver is called for the first
+time, the functional block temperature vector is passed as an argument
+to compute_temp. During subsequent calls however, a NULL pointer is
+passed signalling the solver to maintain its internal state from the
+last call and continue passing on its output to the same temperature
+vector provided earlier. Here is the relevant code snippet from
+'hotspot.c' that does this:
+
+/* first time    */
+if (model->type == BLOCK_MODEL || lines == 0)
+    compute_temp(model, power, temp, model->config->sampling_intvl);
+/* subsequent calls - 'temp' still gets updated every time with the 
+ * transient solution
+ */
+else
+    compute_temp(model, power, NULL, model->config->sampling_intvl);
+
+6. Tips for modeling your own chip
+
+To model your own chip, you need to develop a floorplan for each silicon 
+layer (see ev6.flp for an example) and then provide a power trace for
+each block at each timestep (see gcc.ptrace for an example). The power
+is usually obtained with a power model such as Wattch or McPAT, but could 
+be obtained in CAD simulations, via infrared analysis, direct measurement, etc.
+You can use default cooling solution or specify your own cooling solution
+by changing parameters in hotspot.config. Be sure that no power value is
+provided to internal nodes.
+
+7. HotFloorplan:
+
+a) As mentioned above, one of the inputs to HotFloorplan is a 
+   floorplan description file that has information about the 
+   blocks to be floorplanned. In the file provided with this
+   distribution ('ev6.desc'), the functional unit areas are same
+   as 'ev6.flp.orig'. The maximum aspect ratio constraint is set 
+   to 1:3 except when a block has a bigger aspect ratio in the
+   base floorplan 'ev6.flp.orig'. In that case, the block's aspect
+   ratio from 'ev6.flp.orig' itself forms the upper limit. Also, 
+   the connectivity section of 'ev6.desc' currently lists 13 
+   major interconnects that we thought were important at the 
+   architecture level. They are assumed to be of equal wire 
+   density. Also, the wire_density field of the floorplan 
+   description can be used to assign weights for the different
+   wires according to their contribution to performance. In 
+   'ev6.desc', the assignment of these weights is uniform 
+   across all wires.
+b) HotFloorplan includes a first-order wire-delay model for 
+   wires in the global and intermediate metal layers. It is 
+   a simple stand-alone model that converts wire length to 
+   wire delay and can be used in any tool, whether the thermal 
+   model, floorplan model, or any other simulator. It is 
+   adapted from Otten and Brayton, DAC'98, and related work.
+   The interfaces for the model are provided 'wire.[ch]'. An
+   appropriate process technology node can be chosen by using 
+   the TECHNODE #define in 'wire.h'. After that, the model is
+   a simple call to the function 'wirelength2delay'.
+c) HotFloorplan can be configured through many command line options.
+   The 'hotspot.config' file clearly lists them and what they do.
+   Among the options, following merit further discussion:
+   i) Annealing parameters:
+      The meaning of each of these can be easily obtained from any
+      standard text on VLSI CAD that deals with simulated
+      annealing (e.g.: Sarrafzadeh and Wong, "An Introduction to
+      VLSI Physical Design", McGraw-Hill 1996). The original
+      DAC '86 paper by Wong and Liu on floorplanning is a very good 
+      starting point. 
+  ii) Compaction ratio:
+      During floorplanning, empty spaces can arise in a floorplan.
+      Sometimes, these spaces are just an artifact of the discrete
+      nature of the aspect ratio function of the individual
+      blocks. Typically, about 50% of the maximum possible number 
+      of dead spaces is due to this artifact. Such dead spaces 
+      are very tiny and hence can be safely ignored without any
+      impact on the thermal model. In fact, ignoring such blocks
+      reduces the size of the problem input to the thermal solver.
+      Since the thermal model's solver algorithm is a higher order
+      polynomial function in the number of functional blocks, 
+      ignoring the tiny blocks improves the performance of the
+      floorplanner significantly. The 'compact_ratio' option 
+      sets a threshold on the area of such tiny blocks. The
+      default is 0.5% of the area of the encompassing 'parent 
+      rectangle'. So, dead spaces that are smaller than 0.5% of
+      the parent rectangle are ignored during floorplanning. This
+      results in a maximum error in core area of about 0.46% for 
+      our experiments. This setting, combined with the 'n_orients'
+      setting that determines the magnitude of discreteness of
+      the blocks' aspect ratio function, can be tuned to manage
+      the trade-off between the speed and accuracy of the 
+      floorplanner. It is to be noted that in HotFloorplan, the 
+      empty spaces that are not compacted are named in the form 
+      _0, _1 and so on. It can be seen that the 'output.flp' 
+      generated from the steps discussed above has blocks named
+      in that form.
+ iii) Weights for the metric (objective function):
+      HotFloorplan uses an objective function that is of the form 
+      lambdaA * A + lambdaT * T + lambdaW * W where A, T and W are 
+      the area, temperature and wire length respectively. The
+      weights lambdaA lambdaT and lambdaW can be set through
+      configuration parameters. Please note that for HotFloorplan,
+      A is in the order or hundreds of mm, T is in the order of 
+      hundreds of Kelvin and W is in the order of tens of mm. In
+      combining them to a single metric, the weights have to be
+      assigned in a manner that not only takes into account the
+      desired importance of the variables A, T and W but also 
+      compensates for the mismatch in their units of measurement.
+      The default weights in HotFloorplan are chosen based on this
+      principle. If one is interested in objective functions that 
+      are not in the above-mentioned form, it is quite easy to
+      make the change in HotFloorplan. The design of the simulated 
+      annealing algorithm is such that any arbitrary metric (objective 
+      function) can be incorporated. In HotFloorplan, this is done
+      just by changing the return statement of the 
+      'flp_evaluate_metric' function at the beginning of 'flp.c' into 
+      an appropriate objective function of A, T and W.
+
+CONCLUSION
+----------
+While this document has attempted to provide a detailed overview of
+HotSpot's capabilities and guidelines for its use, the maximum amount
+of information can be obtained only from the source code itself. The
+source is well-commented with sufficient pointers to documentation.
+Particularly, the 'Makefile', sample input data files 
+(eg: 'ev6.flp', 'gcc.ptrace' etc.) and the template simulator 
+'sim-template.c' are all quick sources of information. Moreover, just 
+running the binaries/scripts without any command line switches gives a 
+detailed listing of the available options. In case of further questions, 
+please send e-mail to the HotSpot user group at the address "hotspot AT
+cs.virginia.edu". To subscribe to the list, please visit
+http://www.cs.virginia.edu/mailman/listinfo/hotspot.
+

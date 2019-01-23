@@ -1,0 +1,50 @@
+HotSpot 5.0 Changes
+-------------------
+This release of HotSpot incorporates the following improvements:
+
+1) New Feature #1: Heatsink and fan model
+OPTIONAL: A parameterized heasink package model that lets users to 
+explore the effect on cooling with different configurations of heatsink, 
+fan and air fow. This feature is optinal. There are several newly added 
+files: package.c, package.h and package.config. Commandline option 
+'-package_model_used 1' activates this new feature. The option 
+'-package_config_file <filename>' allows users to use their own package 
+configuration file (format must comply to the example package.config). 
+
+2) New Feature #2: Secondary heat transfer path
+OPTIONAL: Package layers along the secondary heat tranfer path 
+are included in this release (on-chip metal layers as a whole, C4 pads, 
+package substrate, solder balls, and printed-circuit board). In most cases,
+secondary heat transfer path can be neglected. However, in special cases 
+such as oil flow over bare silicon die, the secondary heat transfer path
+plays an important role and should be modeled (e.g. see our ISPASS'09
+paper). To enable this feature, add '-model_secondary 1' in commandline
+or in hotspot.config. Currently, the secondary heat tranfer path mode is
+not supported if multiple silicon layers are configured.
+
+
+3) New Feature #3: Leakage-temperature interactions
+OPTIONAL: A simple leakage model interface that allows users to simulate
+the temperature-leakage interaction. This feature can be enabled by adding
+'-leakage_used 1' in commandline or hotspot.config. Users can use their own 
+leakage model to replace what is inside calc_leakage() in temperature.c.
+This feature is only supported in steady-state temperature calculations. 
+Transient thermal-leakage loop is NOT supported, because the time scales of 
+transient leakage power evolvement are not clear, and it is potentially 
+wrong to assume instantaneous leakage update with increased temperature 
+in each transient step ("sampling interval") in HotSpot.
+
+4) Thermal properties of heasink, speader and thermal interface material are 
+now configurable in 'hotspot.config', as opposed to being hard coded in
+'temperature.h' in earlier releases.
+
+5) Transient thermal time constant fitting factor is changed from 0.5 to 0.333,
+for more accurate transient simulations. 0.5 was derived based on traditional
+Elmore Delay model, which is not fully accurate for thermal RC circuit. Our
+detailed analytical derivation reveals that a factor of 1/3 is the right factor
+for lumped vs. distributed thermal RC circuits.
+
+6) A sample hotspot.exe is included in companion with the MS Excel interface (
+HotSpotUI-5.0.xls), for users who prefer not doing the Windows compilation. If this
+.exe file doesn't work in your Windows system, follow instructions in HOWTO file
+to compile HotSpot under Windows.

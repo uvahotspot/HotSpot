@@ -1,0 +1,81 @@
+- By Ayse K. Coskun, Katsutoshi Kawakami, Daniel Rossell, and Samuel Howes at Boston University.
+- Contact: acoskun@bu.edu
+- Acknowledgemens: Fulya Kaplan at Boston University, Tiansheng Zhang at Boston University, Yasuko Eckert at AMD, Wei Huang at AMD, David Atienza at EPFL, Mohamed M. Sabry at EPFL, Yusuf Leblebici at EPFL, and Tajana Rosing at UCSD.
+- Current release: May 2014
+
+This test case presents an example of using detailed_3D mode in 
+HotSpot. It includes the following contents:
+
+1. Layer Configurtion Files & Floorplan Files:
+---------------------------------------------
+    ev6_3D.lcf:            The layer configuration file for the testcase;
+    ev6_3D_core_layer.flp: The flp file for core layer of the chip;
+    ev6_3D_cache_<1/2>.flp:  The flp file for cache layers of the chip;
+    ev6_3D_TIM.flp:        The thermal interface material layer between the logic layer and heat spreader.
+    ev6_3D_TIM_TSV.flp:    The thermal interface material layer between logic layers (core layer and cache layers).
+    
+    * The .lcf file format is the same as the default HotSpot
+        #File Format:
+        <Layer Number>
+        <Lateral heat flow Y/N?>
+        <Power Dissipation Y/N?>
+        <Specific heat capacity in J/(m^3K)>
+        <Resistivity in (m-K)/W>
+        <Thickness in m>
+        <floorplan file>
+
+        #Example
+        0
+        Y
+        Y
+        1.75e6
+        0.01
+        0.00015
+        ev6_3D_core_layer.flp
+
+    * There is a slight change in the format of the .flp file format
+      that allows units in the floorplan to have different specific
+      heat and resistivity. Note that these fields are mandatory.
+
+      # Line Format: <unit-name>\t<width>\t<height>\t<left-x>\t<bottom-y>\t<specific-heat>\t<resistivity>
+      # all dimensions are in meters, comment lines begin with a '#',
+      # comments and empty lines are ignored
+      # Example
+      Unit1   0.002000    0.002000    0.000000    0.000000    4e6 .02294
+
+2. How to Run:
+--------------
+    >> ./hotspot -c hotspot.config -f <filename> -p <powerfile> \
+                 -steady_file <steadyfile> -model_type grid -detailed_3D on \
+                 -grid_layer_file <lcffile>
+    >> ./hotspot -c hotspot.config -init_file <steadyfile> -f <filename> \
+                 -p <powerfile> -o <ttracefile> -model_type grid -detailed_3D on \
+                 -grid_layer_file <lcffile>
+    
+    * We provide an example .ptrace file for the simulation as well as the output temperature trace of it:
+        ev6_3D.ptrace: Example power trace file.
+        ev6_3D.ttrace: Output temperature trace file corresponding to
+                       ev6_3D.ptrace.
+
+3. Description of the Test Case:
+--------------------------------
+    We assume that the system in this test case contains 4 ev6 cores 
+    and a shared L2 cache. All of the 4 cores are located on the same
+    layer while the L2 cache is split into 2 cache layers. Since the 
+    core layer has higher power dissipation, we put this layer closer
+    to the heat sink.
+
+    In this test case, the TSV unit contains only the connection 
+    between L1 caches and L2 caches. The cache block is 64 Byte, 
+    which means 512 TSVs in each TSV unit. The TSV diameter is 20um, 
+    and the side-to-side pitch is 40um (we assume the TSVs are 
+    organized as 128*4 array, there are plenty of space in between). 
+    Then we calculate the joint thermal resistance of the TSVs block 
+    and put it in the flp file.
+
+    This test case consists of a total of 6 layers: ev6_3D_cache_1 (Silicon), ev6_3D_TIM_TSV (Thermal Interface 
+    Material), ev6_3D_cache_2 (Silicon), ev6_3D_TIM_TSV, 
+    ev6_3D_core_layer (Silicon), and ev6_3D_TIM. The layouts of all 
+    layers are shown in ev6_3d.pdf according to their sequence in the
+    layer configuration file (ev6_3D.lcf).
+

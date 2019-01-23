@@ -1,0 +1,144 @@
+HotSpot 4.0 Changes
+-------------------
+This version of HotSpot incorporates several accuracy enhancements described
+in the following paper:
+
+W. Huang, K. Sankaranarayanan, R. J. Ribando, M. R. Stan and K. Skadron.
+"An Improved Block-Based Thermal Model in HotSpot 4.0 with Granularity 
+Considerations." In Proceedings of the Workshop on Duplicating, 
+Deconstructing, and Debunking, in conjunction with the 34th International 
+Symposium on Computer Architecture (ISCA), June 2007.
+
+While the paper itself focuses on the block model, some of the changes also
+improve the accuracy of the grid model. Specifically, following is a list of 
+the modifications:
+a) Accuracy Enhancements:
+	1) Enhanced package modeling: removal of the forced isotherm
+	2) Modeling of lateral heat flow in the TIM layer
+	3) Block model: a wrapper script to sub-divide floorplan blocks 
+	   with high aspect ratio to improve accuracy
+	4) Grid model: upgradation of the first order transient sover to 
+	   a fourth order adaptive step-size Runge-Kutta solver
+	5) Grid model: an option to maintain grid thermal state across 
+	   calls to the transient solver
+
+b) Updated defaults:
+	The default package parameters have been updated to reflect 
+	contemporary packages. The most significant of the changes are:
+	1) Die thickness has been updated to 0.15 mm down from 0.5 mm.
+	(See: B. Majeed, I. Paul, K. M. Razeeb, J. Barton and S. C. O'Mathuna. 
+	"Microstructural, Mechanical, Fractural and Electrical Characterization 
+	of Thinned and Singulated Silicon Test Die". Journal of Micromechanics 
+	and Microengineering, 16:1519-1529, Aug. 2006.) 
+	2) Tim thickness and resistivity have been updated respectively to 20u 
+	down from 75u and 0.25 mK/W down from 0.75 mK/W. (See: E.C. Samson, 
+	S.V. Machiroutu, J.-Y. Chang, I. Santos, J. Hermerding, A. Dani, 
+	R. Prasher, and D.W.Song. "Interface Material Selection and a Thermal 
+	Management Technique in Second-Generation Platforms Built on Intel 
+	Centrino Mobile Technology." Intel Technology Journal, 9(1), Feb. 2005.)
+
+c) Others:
+	1) Complete re-write of the grid model for easy readability and extensibility.
+	2) Minor bugfixes etc.
+
+Installation
+------------
+1. Download the HotSpot tar ball (HotSpot-4.0.tar.gz) following the
+instructions at http://lava.cs.virginia.edu/HotSpot
+
+2. Unzip and untar the file using the following commands
+	a) gunzip HotSpot-4.0.tar.gz
+	b) tar -xvf HotSpot-4.0.tar
+
+3. Go to the HotSpot installation directory
+	a) cd HotSpot-4.0/
+	
+4. Uncomment the lines corresponding to your installation of the BLAS/LAPACK
+vendor libraries (see http://www.netlib.org/blas/faq.html#5) and set the path
+and compiler options corresponding to your library. This version of HotSpot has
+code integrated for Intel Math Kernel Library, AMD Core Math Library, Apple
+Velocity Engine and Sun Performance Library. Extending it to other vendors
+should be straightforward. For such an extension, apart from the user guide
+from those vendors, http://www.netlib.org/blas/blast-forum/cinterface.pdf might
+also be useful as it provides useful description of the C interface to BLAS.
+
+5. Build HotSpot
+	a) make
+
+7. To remove all the outputs of compilation, type 'make clean'. To remove the
+object files alone, type 'make cleano'. To view the list of files HotSpot needs
+for proper working, type 'make filelist'. To compile for debugging, use 'make
+DEBUG=1'. To compile for using with a profiler (e.g. gprof), use 'make DEBUG=2'.
+
+8. Known compatibility issues:
+	a) For old AMD machines without SSE2 instructions, the most recent version
+	of ACML available is 3.1.0. On such machines, the ACML library works with
+	GCC 4.0 but not with GCC 4.1.
+	b) Linking with Sun Performance Library on old Solaris machines fails as
+	'libmtsk' was not found.
+	(e.g. see http://supportforum.sun.com/jive/thread.jspa?threadID=72529)
+	Installing patch 117560 from Sun's patch finder
+	(http://sunsolve.sun.com/pub-cgi/show.pl?target=patches/patch-access)
+	solves the problem.
+
+Notes on the Modifications:
+---------------------------
+1) As the WDDD paper above mentions, the block model suffers from spatial 
+discretization errors when the modeled blocks have very high aspect ratios.
+In such cases, the user should either use the grid model or the floorplan
+should be modified in such a manner that the blocks are sub-divided into
+square-shaped sub-blocks. To aid in this aspect ratio sub-division, this
+version provides two wrapper scripts: hsconvert-flp.pl and hsconvert-data.pl.
+The former can be  used to convert floorplans with high-aspect-ratio blocks
+while the latter can be used to migrate power/temperature trace data corresponding
+to the old floorplan into the new floorplan. Here is a sample use where ev6.flp.orig
+is the old floorplan and the power trace corresponding to it is gcc.ptrace.orig.
+The following sequence of commands produce a floorplan file (ev6.flp) with 
+nearly square-shaped blocks and a compatible power trace file (gcc.ptrace):
+	hsconvert-flp.pl ev6.flp.orig > ev6.flp
+	hsconvert-data.pl -o ev6.flp.orig -c ev6.flp -p gcc.ptrace.orig > gcc.ptrace
+
+It is to be noted that being a finite-element solver, HotSpot cannot avoid
+discretization errors altogether. However, they can be dealt with effectively 
+as a speed vs. accuracy trade-off. For instance, in cases where higher accuracy 
+is desired, the grid model could be used. It is to be noted that even with the
+grid model, high aspect ratios can be a problem. A common pitfall is using an
+extremely fine mesh in the x-y direction without correspondingly increasing
+the resolution in the z direction. For instance, if one must use a 1000 x 1000
+grid, then the no. of z-layers should also be increased using the grid layer
+file specification so that each volumetric cell is still nearly "cubical" and
+not "tall and skinny". 
+
+2) The interfaces to HotSpot remain almost identical to previous versions. The
+minor differences include:
+
+a) The grid layer file specification has been made optional with the default 
+being one silicon layer and one TIM layer (similar to the block model). This
+change also means that the grid model is now compatible with HotFloorplan.
+However, this compatibility is only theoretical because, for practical grid
+sizes, the grid model would be too slow to be used with HotFloorplan.
+
+b) Before solving for transient temperature, the grid model maps the functional 
+block power and temperature numbers onto each grid cell. After the solution is
+done, the temperature numbers are mapped back onto each functional block.
+This reverse mapping involves averaging. When the transient solver is called
+repeatedly (as is usually the case), and if the internal state of the solver
+is not maintained across calls, this averaging can result in some loss of 
+accuracy. To avoid that, this version of HotSpot provides an option to 
+maintain state across calls to the transient solver of the grid model. When 
+the solver is called for the first time, the functional block temperature 
+vector is passed as an argument to compute_temp. During subsequent calls
+however, a NULL pointer is passed signalling the solver to maintain its
+internal state from the last call and continue passing on its output to the 
+same temperature vector provided earlier. Here is the relevant code snippet 
+from hotspot.c that does this:
+
+	/* first time	*/
+	if (model->type == BLOCK_MODEL || lines == 0)
+		compute_temp(model, power, temp, model->config->sampling_intvl);
+	/* subsequent calls - 'temp' still gets updated every time with the 
+	 * transient solution
+	 */
+	else
+		compute_temp(model, power, NULL, model->config->sampling_intvl);
+

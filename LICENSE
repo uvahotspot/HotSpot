@@ -1,0 +1,58 @@
+LICENSE
+-------
+
+LICENSE TERMS
+
+Copyright (c)2003-2015. All rights reserved.
+
+Permission is hereby granted, without written agreement and without license or
+royalty fees, to use, copy, modify, and distribute this software and its
+documentation for any purpose, provided that the above copyright notice and the
+following four paragraphs appear in all copies of this software, whether in
+binary form or not.
+
+IN NO EVENT SHALL THE AUTHORS, THE UNIVERSITY OF VIRGINIA, OR THE STATE OF
+VIRGINIA BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR
+CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS
+DOCUMENTATION, EVEN IF THEY HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH
+DAMAGE.
+
+THE AUTHORS, THE UNIVERSITY OF VIRGINIA, AND THE STATE OF VIRGINIA SPECIFICALLY
+DISCLAIM ANY WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE PROVIDED
+HEREUNDER IS ON AN "AS IS" BASIS, AND THE AUTHORS HAVE NO OBLIGATION TO PROVIDE
+MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+
+NEITHER THE NAME OF ANY VIRGINIA ENTITY NOR THE NAMES OF THE CONTRIBUTORS MAY
+BE USED TO ENDORSE OR PROMOTE PRODUCTS DERIVED FROM THIS SOFTWARE WITHOUT
+SPECIFIC PRIOR WRITTEN PERMISSION.
+
+If you use this software or a modified version of it, we would appreciate it if
+you would cite one of the following papers:
+
+1) K. Skadron, M. R. Stan, W. Huang, S. Velusamy, D.  Tarjan, and K.
+   Sankaranarayanan, "Temperature-Aware Microarchitecture." In Proceedings of
+   the 30th International Symposium on Computer Architecture, June 2003
+
+2) W. Huang, M. R. Stan, K. Skadron, K. Sankaranarayanan, S. Ghosh, and
+   S. Velusamy, "Compact Thermal Modeling for Temperature-Aware Design." 
+   In Proceedings of the 41st Design Automation Conference, June 2004.
+
+3) K. Sankaranarayanan, S. Velusamy, M. R. Stan, and K. Skadron, "A Case 
+   for Thermal-Aware Floorplanning at the Microarchitectural Level.",
+   Journal of Instruction-Level Parallelism, June 2005.
+
+4) W. Huang, K. Sankaranarayanan, R. J. Ribando, M. R. Stan, and K. Skadron,
+   "Accurate, Pre-RTL Temperature-Aware Processor Design Using a Parameterized, 
+   Geometric Thermal Model Considerations." IEEE Transactions on Computers, 
+   57(9):1277-88, September 2008.
+
+5) W. Huang, K. Skadron, S. Gurumurthi, R. J. Ribando, and M. R. Stan,
+   "Differentiating the Roles of IR Measurement and Simulation of Power and 
+   Temperature-Aware Design" In Proceedings of the 2009 IEEE International 
+   Symposium on Performance Analysis of Systems and Software (ISPASS).
+   April. 2009
+
+6) R. Zhang, M. R. Stan, and K. Skadron, "HotSpot 6.0: Validation,
+   Acceleration and Extension." University of Virginia, Tech. Report
+   CS-2015-04

@@ -1,0 +1,10 @@
+
+# Line Format: <unit-name>\t<width>\t<height>\t<left-x>\t<bottom-y>\t[<specific-heat>]\t[<resistivity>]
+# all dimensions are in meters
+# comment lines begin with a '#' 
+# comments and empty lines are ignored
+
+Unit1	0.008000	0.008000	0.000000	0.008000
+Unit2	0.016000	0.008000	0.000000	0.000000
+Unit3	0.008000	0.008000	0.008000	0.008000
+

@@ -1,0 +1,240 @@
+HotSpot 1.0 - Information Manual
+--------------------------------
+
+CONTENTS
+--------
+	1) License
+	2) Introduction
+	3) Installation
+	4) Using HotSpot
+	5) Contact (E-mailing list)
+	6) References
+
+LICENSE
+-------
+
+LICENSE TERMS
+
+Copyright (c)2003 Wei Huang, Sivakumar Velusamy, Karthik Sankaranarayanan,
+David Tarjan, Mircea R. Stan, and Kevin Skadron.  All rights reserved.
+
+Permission is hereby granted, without written agreement and without license or
+royalty fees, to use, copy, modify, and distribute this software and its
+documentation for any purpose, provided that the above copyright notice and the
+following four paragraphs appear in all copies of this software, whether in
+binary form or not.
+
+IN NO EVENT SHALL THE AUTHORS, THE UNIVERSITY OF VIRGINIA, OR THE STATE OF
+VIRGINIA BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR
+CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS
+DOCUMENTATION, EVEN IF THEY HAVE BEEN ADVISED OF THE POSSIBILITY OF SUCH
+DAMAGE.
+
+THE AUTHORS, THE UNIVERSITY OF VIRGINIA, AND THE STATE OF VIRGINIA SPECIFICALLY
+DISCLAIM ANY WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE PROVIDED
+HEREUNDER IS ON AN "AS IS" BASIS, AND THE AUTHORS HAVE NO OBLIGATION TO PROVIDE
+MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+
+NEITHER THE NAME OF ANY VIRGINIA ENTITY NOR THE NAMES OF THE CONTRIBUTORS MAY
+BE USED TO ENDORSE OR PROMOTE PRODUCTS DERIVED FROM THIS SOFTWARE WITHOUT
+SPECIFIC PRIOR WRITTEN PERMISSION.
+
+If you use this software or a modified version of it, please cite the following
+paper: K. Skadron, M. R. Stan, W. Huang, S. Velusamy, D.  Tarjan, and K.
+Sankaranarayanan. "Temperature-Aware Microarchitecture." In Proceedings of the
+30th International Symposium on Computer Architecture, June 2003
+
+INTRODUCTION
+------------
+
+HotSpot is a computationally efficient, architecture level thermal modeling
+infrastructure developed at the University of Virginia. It makes use of the
+duality that exists between the electrical and thermal properties of materials
+to model processor temperature. It is written in 'C' and can be easily
+interfaced with typical power/performance simulators available in the
+community. It can be downloaded from http://lava.cs.virginia.edu/HotSpot
+
+INSTALLATION
+------------
+
+1. Download the HotSpot tar ball (HotSpot-1.0.tar.gz) following the instructions at
+http://lava.cs.virginia.edu/HotSpot
+
+2. Unzip and untar the file using the following commands
+	a) gunzip HotSpot-1.0.tar.gz
+	b) tar -xvf HotSpot-1.0.tar
+
+3. Go to the HotSpot installation directory
+	a) cd HotSpot-1.0/
+	
+4. Set the appropriate compiler flags and options in the Makefile
+
+5. Build HotSpot
+	a) make (or) make sim-template
+
+6. Run the demo simulator - no errors should be detected
+	a) ./sim-template
+
+7. To remove all the outputs of compilation, type 'make clean'. To remove
+the object files alone, type 'make cleano'. To view the list of files HotSpot
+needs for proper working, type 'make filelist'. 
+
+USING HOTSPOT
+-------------
+
+HotSpot models the temperature of a microprocessor at the granularity of a
+Functional Unit Block (FUB) by making use of the duality that exists between
+heat flow and electricity. It constructs an RC network of thermal resistances
+and capacitances of the FUBs and uses circuit solving techniques to obtain the
+temperatures at the centers of the FUBs. In order to obtain a proper
+understanding of the working of HotSpot, the user is urged to refer to the ISCA
+paper [1] and the Technical Report [2] before proceeding to further sections of
+this manual.
+
+HotSpot software has the following files:
+
+0. Makefile - for building HotSpot
+
+1. RC.h, temperature.c, RCutil.c - these are the core temperature modeling
+modules.
+	- RC.h exports the various temperature modeling function interfaces and
+	  globals.
+	- RCutil.c provides numerical routines for matrix computation and solving
+	  partial differential equations.
+	- temperature.c creates the RC matrices based on the processor floorplan
+	  and other specifications. It uses RCutil.c to solve the circuit. It
+	  contains the two core functions for transient and steady state
+	  temperature modeling - 'compute_temp' and 'steady_state_temp'.
+
+2. flp.h and flp.c  - the floorplanning module. 
+	- This reads the floorplan description of the processor from a file
+	  (ev6.flp) and provides the area and adjacency information required by
+	  temperature.c through function calls. 
+
+3. sim-template.c - demo simulator to illustrate the use of HotSpot.
+	- It demonstrates the use of HotSpot to obtain steady state and transient
+	  temperature numbers through a simple 'main' function that uses sample
+	  power numbers from our test run of the SPEC2000 gcc benchmark. It also
+	  provides dummy 'sim_*' functions which outline the possible use of
+	  HotSpot within a cycle-based power/performance simulator.
+
+4. util.h and util.c - miscellaneous utilities for printing error messages,
+finding max of two numbers etc.
+
+5. ev6.flp - floorplan description input file
+	- This is the floorplan used in the sim-template demo simulator. It closely
+	  resembles the floorplan of the Alpha EV6 microprocessor. 
+
+6. gcc.init - sample initial temperatures input file
+	- The transient modeling in HotSpot requires the initial temperatures to be
+	  set to proper values. One approach (ignoring the effect of
+	  multiprogramming) is to set the steady state temperatures to be the
+	  initial temperatures. This file gives the steady state temperatures
+	  computed using the power numbers obtained from our test run of the
+	  SPEC2000 gcc benchmark. These temperatures form the initial temperatures
+	  of the sim-template demo simulator.
+
+7. tofig.pl - perl script to produce viewable floorplan output
+	- This script takes the output of sim-template (produced by the floorplan
+	  module called within) and outputs the floorplan in a '.fig' file format
+	  that can be displayed and converted using the xfig program.
+
+The two functions 'compute_temp' and 'steady_state_temp' defined in
+temperature.c form the core of HotSpot. They model the transient and steady
+state temperatures respectively. However, using HotSpot involves the following
+Initialization steps to be performed BEFORE using these functions:
+
+a) Initialization of chip and package specs and other globals
+	- The externs defined in RC.h viz. chip dimensions, spreader dimensions,
+	  heat sink dimensions, convection resistance and capacitance, ambient
+	  temperature and thermal trigger threshold are to be initialized with the
+	  proper desired values. 
+
+b) Initialization of the floorplan
+	- The floorplan input file is specified in a particular format. Each FUB's
+	  position and dimensions are specified in a single line. The format of a
+	  line describing an FUB is
+	  '<unit-name>\t<width>\t<height>\t<left-x>\t<bottom-y>'. Comment lines
+	  begin with a '#' and are ignored. Empty lines are also ignored. In order
+	  to initialize the floorplan module, the 'read_flp' function is called
+	  with the floorplan input filename as the parameter.
+
+c) Creation of the RC matrices
+	- This is done by calling 'create_RC_matrices' and passing the pointer to
+	  the floorplan structure returned by the 'read_flp' function. If the
+	  lateral resistances component of the RC network should be ignored, then
+	  the second parameter (int omit_lateral) is set to a non-zero value.
+
+d) Allocation of memory for the temperature and power vectors
+	- It is to be noted that the order of the FUBs in the temperature and power
+	  vectors is the same as that of the floorplan input file. However, the
+	  index of a particular FUB within the power or temperature vector could
+	  also be obtained by calling 'get_blk_index' with the FUB-name as the
+	  parameter. Since HotSpot creates extra nodes in the RC network
+	  (corresponding to the spreader and heat sink), the size of the power and
+	  temperature vectors is larger than the number of FUBs. Hence, memory for
+	  the vectors has to be allocated only through HotSpot. The function that
+	  does this is 'hotspot_vector'.
+
+e) Setting up initial temperatures (for 'compute_temp')
+	- As mentioned above, transient modeling requires the initial temperature
+	  values to be set properly. HotSpot provides two functions to accomplish
+	  this - 'read_temp' and 'set_temp'. 'read_temp' reads initial temperatures
+	  from a file that was previously output using the 'dump_temp' routine.
+	  Note that if the number of FUBs has changed between the 'dump_temp' and
+	  the 'read_temp', then the 'read_temp' could get incorrect values. So,
+	  each time FUBs are added or removed to the floorplan, the initial
+	  temperatures have to be regenerated. 'set_temp' is useful when the steady
+	  state output of a previous run is not available. 'set_temp' sets the
+	  temperatures of all FUBs and internal nodes to a single value which is
+	  passed as a parameter. When a new application is run with HotSpot, a
+	  typical sequence in determining the proper initial temperatures is:
+		- Run the application with all internal nodes and FUBs set to a fixed
+		  initial temperature (say 60C).
+		- Dump the steady state temperatures at the end of the above run. This
+		  is done using the 'dump_temp' function.
+		- Use the above dumped temperatures as the initial temperatures for the
+		  next run.
+		- If the power numbers are dependent on temperature (for eg. if leakage
+		  effects on temperature are modeled), continue the previous two steps
+		  until the temperatures converge.
+	  Note that when power numbers are available off-line, sim-template can be used to
+	  compute the steady state and hence the initial temperatures. The power
+	  numbers in 'main' need to be set accordingly and 'init_file' needs to be
+	  set to NULL for the first time. The output sim-template prints and the file
+	  written by 'dump_temp' called in 'main' contain the proper initial
+	  temperatures for the next run.
+
+Once these initialization steps are performed, using HotSpot is
+straightforward. When average overall power numbers are available, they are
+passed onto 'steady_state_temp' to obtain the steady state temperatures.
+Similarly, 'compute_temp' is called at regular intervals by passing in the time
+elapsed during the interval and the power numbers for that interval. When the
+initial temperatures are set properly, 'compute_temp' advances the temperatures
+by an amount corresponding to the time elapsed. Successive calls to
+'compute_temp' with the same temperature vector give the transient behavior of
+the processor's temperature. HotSpot also provides some uninitialization
+routines that could be called at the end of temperature modeling
+(cleanup_hotspot, free_flp and free_vector). These free up the memory allocated
+for the internal data structures.
+
+CONTACT (E-MAILING LIST)
+------------------------
+
+HotSpot can be downloaded following the instructions at
+http://lava.cs.virginia.edu/HotSpot.  In order to exchange comments, questions
+and answers amidst the users  of HotSpot, we have created an e-mailing list. We
+will try to monitor this list and respond to questions as quickly as possible.
+One can subscribe to this list by visiting
+http://www.cs.virginia.edu/mailman/listinfo/hotspot . This list is archived and
+messages can be sent to it by e-mailing 'hotspot at cs dot virginia dot edu' 
+
+REFERENCES
+----------
+[1] K. Skadron, M. R. Stan, W. Huang, S. Velusamy, K. Sankaranarayanan, and D.
+Tarjan. "Temperature-Aware Microarchitecture", In Proceedings of the 30th
+International Symposium on Computer Architecture, June 2003.
+[2] K. Skadron, M. R. Stan, W. Huang, S. Velusamy, K. Sankaranarayanan, and D.
+Tarjan. "Temperature-Aware Microarchitecture: Extended Discussion and Results",
+University of Virginia Technical Report CS-2003-08, June 2003.

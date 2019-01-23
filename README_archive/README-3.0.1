@@ -1,0 +1,48 @@
+HotSpot-3.0.1 Changes
+---------------------
+1. Release 3.0.1 fixes a few bugs in release 3.0. The most
+important of them being the way the dead space around the
+edge of the chip is modeled. In the previous release, the
+dead space was modeled as four thin strips around the chip
+with aspect ratios that were vastly different from the
+other blocks. This resulted in parasitic shorting of the
+lateral resistances of the blocks near the corner of the 
+chip. This has been fixed now by splitting the rim strips
+into multiple blocks corresponding to the corner functional
+blocks. In cases when the floorplan consists of significantly
+different aspect ratios and granularity, the block model
+could result in some inaccuracy. An example for such a floorplan
+would be a fine-grained variation of the standard floorplan 
+that comes with HotSpot, where the register file alone is 
+sub-divided into a large number of (say 128) entries. In order 
+to avoid such inaccuracies while using such a floorplan, use 
+the 'flp_create_grid' function provided in 'flp.c' to create 
+an equivalent floorplan that can be modeled accurately in 
+HotSpot. The 'flp_create_grid' function creates a non-uniform, 
+grid-like floorplan equivalent to the given floorplan, where 
+there is no partial sharing of edges between blocks. This 
+eliminates the inaccuracy that can arise due to the block 
+model's way of computing the lateral resistances.
+
+2. This release provides a choice to the user for the
+mapping between the grid and block temperatures of the
+grid model. Previously, the temperature of a block reported 
+by the grid model was only the average of all the grid
+cells in it. Now, there are four options available. The
+'min', 'max' and 'avg' options mean that the block's 
+temperature is computed as the minimum, maximum, or average 
+temperature of the grid cells in it. The 'center' option
+means that the block's temperature is given by the 
+temperature of the grid cell at its center.
+
+3. It is to be noted that for the same power density,
+the temperatures reported by the block and grid models
+could differ from each other. This is because both these
+models are fundamentally different in their organization.
+Closer match can be observed when the grid model's mapping
+mode is set to 'max' - i.e., the single temperature reported
+by the block model is closer to the maximum temperature 
+within a block as computed by the grid model. We are 
+currently working on making the two models more accurately
+consistent. Please look for updates soon at the HotSpot
+web page.

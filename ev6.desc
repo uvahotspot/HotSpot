@@ -1,0 +1,40 @@
+# comment lines begin with a '#' 
+# comments and empty lines are ignored
+
+# Area and aspect ratios of blocks
+# Line Format: <unit-name>\t<area-in-m2>\t<min-aspect-ratio>\t<max-aspect-ratio>\t<rotable>
+
+Icache	8.3459e-6	1	3	1
+Dcache	7.8240e-6	1	3	1
+Bpred	2.2690e-6	1	5	1
+DTB	2.2950e-6	1	5	1
+FPAdd	1.9400e-6	1	3	1
+FPReg	0.8350e-6	1	6	1
+FPMul	2.0760e-6	1	3	1
+FPMap	1.4449e-6	1	4	1
+IntMap	1.2830e-6	1	3	1
+IntQ	1.7579e-6	1	3	1
+IntReg	1.2259e-6	1	3	1
+IntExec	3.9849e-6	1	3	1
+FPQ	1.4450e-6	1	3	1
+LdStQ	1.2520e-6	1	3	1
+ITB	0.7820e-6	1	3	1
+L2	214.317e-6	1	3	1
+
+# Connectivity information
+# Line format <unit1-name>\t<unit2-name>\t<wire_density>
+IntExec	IntQ	1
+Bpred	ITB		1
+Bpred	Icache	1
+Dcache	LdStQ	1
+IntMap	IntQ	1
+IntQ	IntReg	1
+DTB		LdStQ	1
+IntMap	LdStQ	1
+FPAdd	FPQ		1
+Dcache	L2		1
+FPMul	FPQ		1
+Icache	L2		1
+FPMap	FPQ		1
+FPQ		FPReg	1
+

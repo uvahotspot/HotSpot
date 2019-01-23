@@ -1,0 +1,96 @@
+HotSpot 2.0 - Changes since version 1.0
+---------------------------------------
+Read the HotSpot 1.0 information manual (README-1.0) first. This file
+only deals with the incremental changes since 1.0.
+
+CONTENTS
+--------
+	1) Installation
+	2) Changes Since Version 1.0
+	3) Usage Instructions
+
+INSTALLATION
+------------
+1. Download the HotSpot tar ball (HotSpot-2.0.tar.gz) following the
+instructions at http://lava.cs.virginia.edu/HotSpot
+
+2. Unzip and untar the file using the following commands
+	a) gunzip HotSpot-2.0.tar.gz
+	b) tar -xvf HotSpot-2.0.tar
+
+3. Go to the HotSpot installation directory
+	a) cd HotSpot-2.0/
+	
+4. Set the appropriate compiler flags and options in the Makefile
+
+5. Build HotSpot
+	a) make (or) make sim-template
+
+6. Run the demo simulator - no errors should be detected
+	a) ./sim-template
+
+7. To remove all the outputs of compilation, type 'make clean'. To
+remove the object files alone, type 'make cleano'. To view the list of
+files HotSpot needs for proper working, type 'make filelist'. 
+
+CHANGES SINCE VERSION 1.0
+-------------------------
+1. Modifications from the previous version 
+	a) The demo main function in sim-template.c is now modified to
+	read in power trace files and output temperature trace files. 
+	b) The central heat spreader node, which was monolithic, is also
+	divided now into multiple blocks - just like the die.
+	c) Bug fixes - 'getr' function and C_FACTOR modified.
+
+2. New in HotSpot 2.0
+	a) A thermal model for the interface material between the die and
+	the heat spreader.
+	b) Validation of the HotSpot model against an actual test-chip. 
+	d) New sample power trace input file - 'gcc.p' and temperature
+	trace output file 'gcc.t'.
+
+USAGE INSTRUCTIONS
+------------------
+1. Floorplan specification:
+	The floorplan is specified fully. Placement of each functional
+	unit is described in a single line in the format
+	"<unit-name>\t<width>\t<height>\t<left-x>\t<bottom-y>\n". A sample
+	floorplan similar to Alpha EV6 is provided ('ev6.flp'). All the
+	units have to be fully specified. There cannot be any empty spaces
+	in the chip.
+2. Power input:
+	The instantaneous power values of each functional unit is input in
+	the form of a trace file. A sample trace file is provided
+	('gcc.p'). Each line is tab-separated. First line lists the names
+	of the functional blocks. Subsequent lines are the power values of
+	those units in Watts. Each column corresponds to a functional unit
+	and each line corresponds to a single unit of time (sampling
+	interval).
+3. Initial temperature setup:
+	The set of initial temperatures is also specified in a file. A
+	sample initial temperature file is provided ('gcc.init'). The
+	values are in Kelvin. HotSpot starts modeling the instantaneous
+	temperature starting at this set of initial values.
+4. Specification of chip and package parameters:
+	These are the externs in 'RC.h'. These are assigned with default
+	values in 'sim-template.c' and can be changed to values desired by
+	the user.
+5. Temperature simulation:
+	A sample 'main' function is provided in sim-template.c. This uses
+	the floorplan, power trace input, initial temperatures and package
+	parameters mentioned above in conjunction with the HotSpot model
+	to produce instantaneous temperature values for time intervals
+	corresponding to the power trace. The output temperature values
+	are written into 'gcc.t' by default. The sample 'main' function
+	also outputs the steady-state temperature values onto 'stdout'.
+	Steady-state temperatures are those that would result if the
+	average power across the simulation interval is maintained for
+	infinite time. For convenience, these numbers are also output to a
+	file 'gcc.steady'. In the absence of enough simulation time to
+	warm the chip up, the simulation can be begun with these steady
+	state values as the initial temperatures. Hence, the format of
+	'gcc.steady' is the same as that of 'gcc.init'. All temperature
+	outputs mentioned above are in Celsius except 'gcc.steady' which
+	is in Kelvin. Further, the format of 'gcc.t' - the temperature
+	output trace file, is the same as the power input trace 'gcc.p',
+	except that the values are in Celsius now instead of Watts.

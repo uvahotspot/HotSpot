@@ -1,0 +1,93 @@
+HotSpot 3.1 Changes
+-------------------
+This version of HotSpot incorporates significant performance enhancements
+to the block model with the most important of them being a contribution
+from Greg Link (http://www.drgreglink.com/), who recently obtained his PhD
+from Penn State University, and is now with the York College of Pennyslvania.
+This contribution comes from his HotSpot-based thermal modeling tool
+HS3d (http://www.cse.psu.edu/~link/hs3d.html). Where available, it replaces
+HotSpot's matrix and vector function calls with calls to vendor-provided
+fast math libraries conforming to the Basic Linear Algebra Subprograms
+(BLAS: http://www.netlib.org/blas/) and Linear Algebra Package (LAPACK:
+http://www.netlib.org/lapack/) standards. This provides significant increase
+in performance for large floorplans (with say, greater than 100 units) where
+the resultant matrices are huge.
+
+Other improvements include an algorithmic speedup of the block model's
+steady-state solver and conversion of the transient Runge-Kutta (RK4) solver
+from a fixed step-size method to an adaptive one. The adaptive RK4 solver,
+which is based upon the discussion in the "Numerical Recipes in C" book,
+(http://www.library.cornell.edu/nr/bookcpdf.html) adjusts its step size
+to the need of the problem. When the temperature changes rapidly (i.e., the
+slope is steep), it uses small steps and when the temperature curve is flat
+(the slope is shallow), it rushes through the solution with large steps. In
+each step, it ascertains its own accuracy by computing the temperature twice
+- once with the desired step size and another time with two half-steps. When
+the difference between these two computations is greater than an allowable
+limit, the step-size is decreased and vice-versa.
+
+Installation
+------------
+1. Download the HotSpot tar ball (HotSpot-3.1.tar.gz) following the
+instructions at http://lava.cs.virginia.edu/HotSpot
+
+2. Unzip and untar the file using the following commands
+	a) gunzip HotSpot-3.1.tar.gz
+	b) tar -xvf HotSpot-3.1.tar
+
+3. Go to the HotSpot installation directory
+	a) cd HotSpot-3.1/
+	
+4. Uncomment the lines corresponding to your installation of the BLAS/LAPACK
+vendor libraries (see http://www.netlib.org/blas/faq.html#5) and set the path
+and compiler options corresponding to your library. This version of HotSpot has
+code integrated for Intel Math Kernel Library, AMD Core Math Library, Apple
+Velocity Engine and Sun Performance Library. Extending it to other vendors
+should be straightforward. For such an extension, apart from the user guide
+from those vendors, http://www.netlib.org/blas/blast-forum/cinterface.pdf might
+also be useful as it provides useful description of the C interface to BLAS.
+
+5. Build HotSpot
+	a) make
+
+7. To remove all the outputs of compilation, type 'make clean'. To remove the
+object files alone, type 'make cleano'. To view the list of files HotSpot needs
+for proper working, type 'make filelist'. To compile for debugging, use 'make
+DEBUG=1'. To compile for using with a profiler (e.g. gprof), use 'make DEBUG=2'.
+
+8. Known compatibility issues:
+	a) For old AMD machines without SSE2 instructions, the most recent version
+	of ACML available is 3.1.0. On such machines, the ACML library works with
+	GCC 4.0 but not with GCC 4.1.
+	b) Linking with Sun Performance Library on old Solaris machines fails as
+	'libmtsk' was not found.
+	(e.g. see http://supportforum.sun.com/jive/thread.jspa?threadID=72529)
+	Installing patch 117560 from Sun's patch finder
+	(http://sunsolve.sun.com/pub-cgi/show.pl?target=patches/patch-access)
+	solves the problem.
+
+Guidelines for Adaptive RK4
+---------------------------
+Adaptive RK4 adapts its step size by performing at each step size, almost
+twice the computation of non-adaptive RK4. For small sampling intervals, there
+is very little opportunity for gains due to adaptivity as there are only a few
+steps to take even with a fixed step-size. Hence, adaptive RK4 might be slower
+than the non-adaptive counterpart at small sampling intervals. However, at
+larger intervals, even gains of multiple orders of magnitude are possible due
+to adaptivity. Hence, it is important to choose the correct sampling interval
+corresponding to your specific application.
+
+A typical use of HotSpot in a processor simulator involves two runs - once with
+default initial temperatures and a second time with initial temperatures set to
+the steady-state temperatures computed in the previous run. During the second
+run, since the transient temperatures are close to the steady-state, the slopes
+are shallow and adaptive RK4 runs faster as it adapts itself into larger
+step-sizes. If the average power values are available, the first run can be
+entirely avoided as its purpose is only to compute the steady-state
+temperatures. To facilitate this in the trace-driven 'hotspot' binary, its
+command line options have been modified in this version. The "-o <file>" option
+that outputs transient temperatures to the temperature trace file, has been
+changed from being mandatory to optional. When the option is not provided,
+transient simulation is avoided and only the steady-state temperatures are
+computed based upon the average power values computed from the instantaneous
+values in the power trace file.

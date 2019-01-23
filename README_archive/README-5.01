@@ -1,0 +1,5 @@
+HotSpot 5.01 Changes
+-------------------
+1) This release fixes a bug in the adaptive step size calculation of the numerical integration routine (RK4) that could result in an error when HotSpot's default transient temperature functions are modified (for e.g. to start with a much larger step size or to target a much higher thermal precision than the default 0.01 C). Thanks to Nima Aghaee (http://sites.google.com/site/nimaaghaee/) for identifying the bug and outlining the approach for a fix.
+
+2) Also fixed a bug in temperature_grid.c

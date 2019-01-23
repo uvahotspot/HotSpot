@@ -1,0 +1,27 @@
+HotSpot 4.1 Changes
+-------------------
+This release of HotSpot incorporates the following improvements:
+
+1) The steady-state solver of the grid model has been upgraded from
+a Gauss-Seidel solver to a multigrid solver. This results in typical
+steady-state computation speedups > 20x. In order to facilitate the
+multigrid implementation, now the grid dimensions are required to be
+a power of two. Hence, the default grid size has been modified from 
+50x50 to 64x64. 
+
+2) The simulator template (sim-template.c) that illustrates the use 
+of HotSpot in a typical cycle-accurate simulator has been upgraded 
+to include grid model usage. Earlier it only demonstrated the use of 
+the block model (sim-template_block.c)
+
+3) The 'Makefile' has been upgraded to wrap HotSpot into a library 
+(libhotspot.a) for easier integration with existing simulators.
+
+4) Bugfixes etc.:
+	a) A bug in 'hotspot.c' lead to erroneous power averaging in
+	modeling 3-D chips while using the grid model. This has been
+	fixed in this release.
+	b) A bug in the floorplan plotting script 'tofig.pl' caused
+	temporary files not to be deleted. It has been fixed now.
+	c) Other minor changes like fixing typos etc.
+

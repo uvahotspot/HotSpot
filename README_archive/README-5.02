@@ -1,0 +1,6 @@
+HotSpot 5.02 Changes
+-------------------
+1) The RK4 bugfix in the previous release introduced another bug, which is fixed in this release. Thanks to Ivan Ukhov for identifying it. 
+
+2) Other minor bugfixes including compiler warnings.
+
