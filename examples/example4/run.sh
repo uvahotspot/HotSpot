@@ -4,6 +4,9 @@
 rm -f *.init
 rm -f outputs/*
 
+# Create outputs directory if it doesn't exist
+mkdir outputs
+
 # The modeling of a 2-D chip's C4 pad array or a 3-D chip's thermal vias
 # requires support for heterogeneous materials within one layer.
 # Thanks to Prof. Ayse Coskun's research team in Boston University,

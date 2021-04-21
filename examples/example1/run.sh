@@ -4,6 +4,9 @@
 rm -f gcc.init
 rm -f outputs/*
 
+# Create outputs directory if it doesn't exist
+mkdir outputs/
+
 # The thermal model is bundled as a trace-level simulator that takes a
 # power trace file and a floorplan file as inputs and outputs the
 # corresponding transient temperatures onto a temperature trace file.
