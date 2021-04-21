@@ -3,6 +3,11 @@
 
 #include <stdio.h>
 
+#if SUPERLU > 0
+/* Lib for SuperLU */
+#include "slu_ddefs.h"
+#endif
+
 #define MAX(x,y)		(((x)>(y))?(x):(y))
 #define MIN(x,y)		(((x)<(y))?(x):(y))
 #define MAX3(a,b,c)		MAX(MAX(a,b),c)
@@ -50,7 +55,7 @@ void zero_ivector (int *v, int n);
 double sum_dvector (double *v, int n);
 
 /* matrix routines - Thanks to Greg Link
- * from Penn State University for the 
+ * from Penn State University for the
  * memory allocators/deallocators
  */
 double **dmatrix(int nr, int nc);
@@ -69,8 +74,8 @@ void copy_imatrix(int **dst, int **src, int nr, int nc);
 void resize_imatrix(int **m, int nr, int nc);
 
 /* routines for 3-d matrix with tail	*/
-/* allocate 3-d matrix with 'nr' rows, 'nc' cols, 
- * 'nl' layers	and a tail of 'xtra' elements 
+/* allocate 3-d matrix with 'nr' rows, 'nc' cols,
+ * 'nl' layers	and a tail of 'xtra' elements
  */
 double ***dcuboid_tail(int nr, int nc, int nl, int xtra);
 /* destructor	*/
@@ -89,9 +94,9 @@ typedef struct str_pair_st
 	char name[STR_SIZE];
 	char value[STR_SIZE];
 }str_pair;
-/* 
+/*
  * reads tab-separated name-value pairs from file into
- * a table of size max_entries and returns the number 
+ * a table of size max_entries and returns the number
  * of entries read successfully
  */
 int read_str_pairs(str_pair *table, int max_entries, char *file);
@@ -101,40 +106,84 @@ int parse_cmdline(str_pair *table, int max_entries, int argc, char **argv);
 void dump_str_pairs(str_pair *table, int size, char *file, char *prefix);
 /* table lookup	for a name */
 int get_str_index(str_pair *table, int size, char *str);
-/* 
- * remove duplicate names in the table - the entries later 
+/*
+ * remove duplicate names in the table - the entries later
  * in the table are discarded. returns the new size of the
  * table
  */
 int str_pairs_remove_duplicates(str_pair *table, int size);
-/* 
+/*
  * binary search a sorted double array 'arr' of size 'n'. if found,
- * the 'loc' pointer has the address of 'ele' and the return 
- * value is TRUE. otherwise, the return value is FALSE and 'loc' 
+ * the 'loc' pointer has the address of 'ele' and the return
+ * value is TRUE. otherwise, the return value is FALSE and 'loc'
  * points to the 'should have been' location
  */
 int bsearch_double(double *arr, int n, double ele, double **loc);
-/* 
+/*
  * binary search and insert an element into a partially sorted
  * double array if not already present. returns FALSE if present
  */
 int bsearch_insert_double(double *arr, int n, double ele);
 
-/* 
- * population count of an 8-bit integer - using pointers from 
+/* search if an array contains a value
+ * return the index if so and -1 otherwise
+ */
+int contains(int *array, int size, int value);
+
+/*
+ * population count of an 8-bit integer - using pointers from
  * http://aggregate.org/MAGIC/
  */
 unsigned int ones8(register unsigned char n);
-/* 
+/*
  * find the number of non-empty, non-comment lines
  * in a file open for reading
  */
 int count_significant_lines(FILE *fp);
 
 /* For Matrix format conversion */
-int coo2csc(int size, int nnz, 
+int coo2csc(int size, int nnz,
             int *cooX, int *cooY, double *cooV,
             int *cscRowInd, int *cscColPtr, double *cscV);
 int c2c_cmp( const void *a , const void *b);
+
+void gaussj(double **a, int n, double *b);
+
+#if SUPERLU > 0
+/* Some Basic Matrix Data Structures and Operations */
+
+/*
+ * Structure to store a diagonal matrix
+ */
+typedef struct diagonal_matrix_t_st
+{
+  int n;
+  double *vals;
+} diagonal_matrix_t;
+
+/*
+ * computes A = c*diag + A
+ */
+int diagonal_add_SparseMatrix(double c, diagonal_matrix_t *diag, SuperMatrix *A);
+
+/*
+ * computes vector = c*diag*vector
+ */
+int diagonal_mul_vector(double c, diagonal_matrix_t *diag, double **vector);
+
+/*
+ * computes vector2 = c1*vector[1] + c2*vector[2]
+ */
+int vector_add_vector(int n, double c1, double *vector1, double c2, double *vector2);
+
+/*
+ * computes vector = A*vector
+ */
+int SparseMatrix_mul_vector(SuperMatrix *A, double *vector);
+
+void cooTocsv(char *filename, int size, int nnz, int *cooX, int *cooY, double *cooV);
+void diagTocsv(char *filename, diagonal_matrix_t *diag);
+void vectorTocsv(char *filename, int size, double *vector);
+#endif
 
 #endif

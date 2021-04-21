@@ -3,6 +3,8 @@
 
 #include "flp.h"
 #include "util.h"
+#include "microchannel.h"
+#include "materials.h"
 
 /* temperature sanity check threshold for natural convection and thermal runaway*/
 #define TEMP_HIGH	500.0
@@ -29,9 +31,9 @@
 
 /* number of extra nodes due to the model:
  * 4 spreader nodes, 4 heat sink nodes under
- * the spreader (center), 4 peripheral heat 
+ * the spreader (center), 4 peripheral heat
  * sink nodes (north, south, east and west)
- * and a separate node for the ambient 
+ * and a separate node for the ambient
  */
 #define EXTRA		12
 /* spreader nodes	*/
@@ -86,28 +88,28 @@
 
 /* typical thermal properties for secondary path layers */
 /* */
-#define RHO_METAL	0.0025	
+#define RHO_METAL	0.0025
 #define RHO_DIELECTRIC	1.0
 #define RHO_C4	0.8
 #define RHO_UNDERFILL 0.03
 #define	RHO_SUB	0.5
 #define RHO_SOLDER	0.06
 #define RHO_PCB	0.333
-#define K_METAL	(1.0/RHO_METAL)	
+#define K_METAL	(1.0/RHO_METAL)
 #define K_DIELECTRIC (1.0/RHO_DIELECTRIC)
 #define K_C4	(1.0/RHO_C4)
 #define K_UNDERFILL (1.0/RHO_UNDERFILL)
-#define K_SUB	(1.0/RHO_SUB)	
-#define K_SOLDER	(1.0/RHO_SOLDER)	
+#define K_SUB	(1.0/RHO_SUB)
+#define K_SOLDER	(1.0/RHO_SOLDER)
 #define K_PCB	(1.0/RHO_PCB)
 //FIXME! the following values need to be found
 #define SPEC_HEAT_METAL	3.55e6	/* specfic heat of silicon in J/(m^3K)	*/
-#define SPEC_HEAT_DIELECTRIC	2.2e6  
-#define SPEC_HEAT_C4	1.65e6  
-#define SPEC_HEAT_UNDERFILL	2.65e6  
+#define SPEC_HEAT_DIELECTRIC	2.2e6
+#define SPEC_HEAT_C4	1.65e6
+#define SPEC_HEAT_UNDERFILL	2.65e6
 #define SPEC_HEAT_SUB	1.6e6	/* specific heat of copper in J/(m^3K)	*/
 #define SPEC_HEAT_SOLDER	2.1e6		/* specific heat of the interface material in J/(m^3K)	*/
-#define SPEC_HEAT_PCB	1.32e6	
+#define SPEC_HEAT_PCB	1.32e6
 
 /* model specific constants	*/
 /* changed from 1/2 to 1/3 due to the difference from traditional Elmore Delay scenario */
@@ -117,11 +119,11 @@
 #define MIN_STEP	1e-7	/* 0.1 us	*/
 
 /* BLAS/LAPACK definitions	*/
-#define MA_NONE		0 
-#define MA_INTEL	1 
-#define MA_AMD		2 
-#define MA_APPLE	3 
-#define MA_SUN		4 
+#define MA_NONE		0
+#define MA_INTEL	1
+#define MA_AMD		2
+#define MA_APPLE	3
+#define MA_SUN		4
 
 #if (MATHACCEL == MA_INTEL)
 	#include <mkl_cblas.h>
@@ -162,7 +164,7 @@ typedef struct thermal_config_t_st
 	double t_interface;	/* interface material thickness in meters	*/
 	double k_interface;	/* interface material thermal conductivity */
 	double p_interface; /* interface material specific heat */
-	
+
 	/* secondary path specs */
 	int model_secondary;
 	double r_convec_sec;
@@ -191,14 +193,14 @@ typedef struct thermal_config_t_st
 	int dtm_used;			/* flag to guide the scaling of init Ts	*/
 	/* model type - block or grid */
 	char model_type[STR_SIZE];
-	
+
 	/* temperature-leakage loop */
 	int leakage_used;
 	int leakage_mode;
-	
+
 	/* package model */
 	int package_model_used; /* flag to indicate whether package model is used */
-	char package_config_file[STR_SIZE]; /* package/fan configurations */ 
+	char package_config_file[STR_SIZE]; /* package/fan configurations */
 
 	/* parameters specific to block model	*/
 	int block_omit_lateral;	/* omit lateral resistance?	*/
@@ -212,18 +214,20 @@ typedef struct thermal_config_t_st
 	char grid_steady_file[STR_SIZE];
 	/* mapping mode between grid and block models	*/
 	char grid_map_mode[STR_SIZE];
-	
-	int detailed_3D_used; //BU_3D: Added parameter to check for heterogenous R-C model 
+  /* transient grid temperatures to file */
+  char grid_transient_file[STR_SIZE];
+
+	int detailed_3D_used; //BU_3D: Added parameter to check for heterogenous R-C model
 }thermal_config_t;
 
 /* defaults	*/
 thermal_config_t default_thermal_config(void);
-/* 
+/*
  * parse a table of name-value string pairs and add the configuration
  * parameters to 'config'
  */
-void thermal_config_add_from_strs(thermal_config_t *config, str_pair *table, int size);
-/* 
+void thermal_config_add_from_strs(thermal_config_t *config, materials_list_t *materials_list, str_pair *table, int size);
+/*
  * convert config into a table of name-value pairs. returns the no.
  * of parameters converted
  */
@@ -243,7 +247,7 @@ typedef struct package_RC_t_st
 	double r_hs2_y;
 	/* sink's outer periphery */
 	double r_hs;
-	
+
 	/* vertical resistances */
 	/* peripheral spreader nodes */
 	double r_sp_per_x;
@@ -273,9 +277,9 @@ typedef struct package_RC_t_st
 	/* sink's outer periphery	*/
 	double r_amb_per;
 	double c_amb_per;
-	
+
 	/* secondary path R's and C's */
-	
+
 	/* lateral resistances	*/
 	/* peripheral package substrate nodes */
 	double r_sub1_x;
@@ -290,7 +294,7 @@ typedef struct package_RC_t_st
 	double r_pcb2_y;
 	/* PCB's outer periphery */
 	double r_pcb;
-	
+
 	/* vertical resistances */
 	/* peripheral package substrate nodes */
 	double r_sub_per_x;
@@ -326,7 +330,7 @@ typedef struct package_RC_t_st
 	/* PCB's outer periphery	*/
 	double r_amb_sec_per;
 	double c_amb_sec_per;
-	
+
 }package_RC_t;
 /* package parameter routines	*/
 void populate_package_R(package_RC_t *p, thermal_config_t *config, double width, double height);
@@ -354,7 +358,8 @@ typedef struct RC_model_t_st
 
 /* constructor/destructor	*/
 /* placeholder is an empty floorplan frame with only the names of the functional units	*/
-RC_model_t *alloc_RC_model(thermal_config_t *config, flp_t *placeholder, int do_detailed_3D);
+RC_model_t *alloc_RC_model(thermal_config_t *config, flp_t *placeholder, microchannel_config_t *microchannel_config, materials_list_t *materials_list,
+	                         int do_detailed_3D, int use_microchannels);
 void delete_RC_model(RC_model_t *model);
 
 /* initialization	*/
@@ -370,10 +375,10 @@ double *hotspot_vector(RC_model_t *model);
  * elements starting at 'at'. useful in floorplan
  * compaction
  */
-void trim_hotspot_vector(RC_model_t *model, double *dst, double *src, 
+void trim_hotspot_vector(RC_model_t *model, double *dst, double *src,
 						 int at, int size);
-/* update the model's node count	*/						 
-void resize_thermal_model(RC_model_t *model, int n_units);						 
+/* update the model's node count	*/
+void resize_thermal_model(RC_model_t *model, int n_units);
 void set_temp (RC_model_t *model, double *temp, double val);
 void dump_temp (RC_model_t *model, double *temp, char *file);
 void copy_temp (RC_model_t *model, double *dst, double *src);
@@ -400,17 +405,22 @@ void lusolve(double **a, int n, int *p, double *b, double *x, int spd);
 /* 4th order Runge Kutta solver with adaptive step sizing */
 double rk4(void *model, double *y, void *p, int n, double *h, double *yout, slope_fn_ptr f);
 
+#if SUPERLU > 0
+/* Backward Euler solver with adaptive step sizing */
+double backward_euler(SuperMatrix *G, diagonal_matrix_t *C, double *T, double *P, double *h, double *Tout);
+#endif
+
 /* matrix and vector routines	*/
 void matmult(double **c, double **a, double **b, int n);
 /* same as above but 'a' is a diagonal matrix stored as a 1-d array	*/
-void diagmatmult(double **c, double *a, double **b, int n); 
+void diagmatmult(double **c, double *a, double **b, int n);
 void matvectmult(double *vout, double **m, double *vin, int n);
 /* same as above but 'm' is a diagonal matrix stored as a 1-d array	*/
 void diagmatvectmult(double *vout, double *m, double *vin, int n);
-/* 
+/*
  * inv = m^-1, inv, m are n by n matrices.
- * the spd flag indicates that m is symmetric 
- * and positive definite 
+ * the spd flag indicates that m is symmetric
+ * and positive definite
  */
 void matinv(double **inv, double **m, int n, int spd);
 

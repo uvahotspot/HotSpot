@@ -28,7 +28,7 @@ Y
 1.75e6
 0.01
 0.00015
-example.flp
+floorplan1.flp
 
 # Layer 1: thermal interface material (TIM)
 1
@@ -37,7 +37,7 @@ N
 4e6
 0.25
 2.0e-05
-example.flp
+floorplan1.flp
 
 # Layer 2: Silicon
 2
@@ -46,7 +46,7 @@ Y
 1.75e6
 0.01
 0.00015
-ev6.flp.orig
+floorplan2.flp
 
 # Layer 3: thermal interface material (TIM)
 3
@@ -55,5 +55,5 @@ N
 4e6
 0.25
 2.0e-05
-ev6.flp.orig
+floorplan2.flp
 

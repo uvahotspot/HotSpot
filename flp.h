@@ -20,8 +20,8 @@
 /* L2 sizing ratio of arm width to base height	*/
 #define WRAP_L2_RATIO	5
 
-/* 
- * chip edge has true dead space, which is 
+/*
+ * chip edge has true dead space, which is
  * modeled by the following blocks
  */
 #define RIM_LEFT		1
@@ -73,12 +73,12 @@ typedef struct flp_config_t_st
 	/* area ratio below which to ignore dead space	*/
 	double compact_ratio;
 
-	/* 
+	/*
 	 * no. of discrete orientations for a shape curve.
 	 * should be an even number greater than 1
 	 */
 	int n_orients;
-	
+
 	/* annealing parameters	*/
 	double P0;		/* initial acceptance probability	*/
 	double Davg;	/* average change (delta) in cost	*/
@@ -127,7 +127,7 @@ typedef struct unit_t_st
 	double leftx;
 	double bottomy;
 	//BU_3D: new parameters for each functional unit. Allows for specific R-C values at a block-level.
-	double specificheat;							
+	double specificheat;
 	double resistivity;
 	int hasRes;
 	int hasSh;
@@ -147,12 +147,12 @@ typedef struct flp_t_st
 
 /* default flp_config	*/
 flp_config_t default_flp_config(void);
-/* 
+/*
  * parse a table of name-value string pairs and add the configuration
  * parameters to 'config'
  */
 void flp_config_add_from_strs(flp_config_t *config, str_pair *table, int size);
-/* 
+/*
  * convert config into a table of name-value pairs. returns the no.
  * of parameters converted
  */
@@ -172,27 +172,27 @@ void print_flp_desc(flp_desc_t *flp_desc);
 /* create a floorplan placeholder from description	*/
 flp_t *flp_placeholder(flp_desc_t *flp_desc);
 /* skip floorplanning and read floorplan directly from file */
-flp_t *read_flp(char *file, int read_connects);
-/* 
- * main flooplanning routine - allocates 
+flp_t *read_flp(char *file, int read_connects, int initialize_connects);
+/*
+ * main flooplanning routine - allocates
  * memory internally. returns the number
  * of compacted blocks
- */ 
+ */
 int floorplan(flp_t *flp, flp_desc_t *flp_desc,
 			  struct RC_model_t_st *model, double *power);
-/* 
- * print the floorplan in a FIG like format 
- * that can be read by tofig.pl to produce 
- * an xfig output 
+/*
+ * print the floorplan in a FIG like format
+ * that can be read by tofig.pl to produce
+ * an xfig output
  */
 void print_flp_fig (flp_t *flp);
 /* debug print	*/
-void print_flp (flp_t *flp);
+void print_flp (flp_t *flp, int print_connects);
 /* print the statistics about this floorplan	*/
 void print_flp_stats(flp_t *flp, struct RC_model_t_st *model,
-					 char *l2_label, char *power_file, 
+					 char *l2_label, char *power_file,
 					 char *connects_file);
-/* wrap the L2 around this floorplan	*/			   
+/* wrap the L2 around this floorplan	*/
 void flp_wrap_l2(flp_t *flp, flp_desc_t *flp_desc);
 /* wrap the rim blocks around - returns the no. of blocks	*/
 int flp_wrap_rim(flp_t *flp, double rim_thickness);
@@ -200,7 +200,7 @@ int flp_wrap_rim(flp_t *flp, double rim_thickness);
 void flp_translate(flp_t *flp, double x, double y);
 /* scale the floorplan by a factor 'factor'	*/
 void flp_scale(flp_t *flp, double factor);
-/* 
+/*
  * change the orientation of the floorplan by
  * rotating and/or flipping. the target orientation
  * is specified in 'target'. 'width', 'height', 'xorig'
@@ -209,7 +209,7 @@ void flp_scale(flp_t *flp, double factor);
 void flp_change_orient(flp_t *flp, double xorig, double yorig,
 					   double width, double height, orient_t target);
 
-/* 
+/*
  * create a non-uniform grid-like floorplan equivalent to this.
  * this function is mainly useful when using the HotSpot block
  * model to model floorplans of drastically differing aspect
@@ -218,9 +218,9 @@ void flp_change_orient(flp_t *flp, double xorig, double yorig,
  * where the register file is subdivided into say 128 entries.
  * the HotSpot block model could result in inaccuracies while
  * trying to model such floorplans of differing granularity.
- * if such inaccuracies occur, use this function to create an 
- * equivalent floorplan that can be modeled accurately in 
- * HotSpot. 'map' is an output parameter to store the 2-d array 
+ * if such inaccuracies occur, use this function to create an
+ * equivalent floorplan that can be modeled accurately in
+ * HotSpot. 'map' is an output parameter to store the 2-d array
  * allocated by the function.
  */
 flp_t *flp_create_grid(flp_t *flp, int ***map);
@@ -230,12 +230,12 @@ void free_blkgrid_map(flp_t *flp, int **map);
 void xlate_power_blkgrid(flp_t *flp, flp_t *grid, \
 						 double *bpower, double *gpower, int **map);
 /* the metric used to evaluate the floorplan	*/
-double flp_evaluate_metric(flp_t *flp, struct RC_model_t_st *model, double *power, 
+double flp_evaluate_metric(flp_t *flp, struct RC_model_t_st *model, double *power,
 						   double lambdaA, double lambdaT, double lambdaW);
 /* dump the floorplan onto a file	*/
 void dump_flp(flp_t *flp, char *file, int dump_connects);
 /* memory uninitialization	*/
-void free_flp(flp_t *flp, int compacted);
+void free_flp(flp_t *flp, int compacted, int free_connects);
 
 
 /* placed floorplan access routines	*/

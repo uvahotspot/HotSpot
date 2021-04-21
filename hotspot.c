@@ -1,7 +1,7 @@
-/* 
- * This is a trace-level thermal simulator. It reads power values 
- * from an input trace file and outputs the corresponding instantaneous 
- * temperature values to an output trace file. It also outputs the steady 
+/*
+ * This is a trace-level thermal simulator. It reads power values
+ * from an input trace file and outputs the corresponding instantaneous
+ * temperature values to an output trace file. It also outputs the steady
  * state temperature values to stdout.
  */
 #include <stdio.h>
@@ -18,17 +18,22 @@
 #include "temperature_grid.h"
 #include "util.h"
 #include "hotspot.h"
+#include "microchannel.h"
+#include "materials.h"
+
+// My stuff
+#define PRINT_GRID_TRANSIENT 1
 
 /* HotSpot thermal model is offered in two flavours - the block
  * version and the grid version. The block model models temperature
  * per functional block of the floorplan while the grid model
- * chops the chip up into a matrix of grid cells and models the 
+ * chops the chip up into a matrix of grid cells and models the
  * temperature of each cell. It is also capable of modeling a
  * 3-d chip with multiple floorplans stacked on top of each
  * other. The choice of which model to choose is done through
- * a command line or configuration file parameter model_type. 
+ * a command line or configuration file parameter model_type.
  * "-model_type block" chooses the block model while "-model_type grid"
- * chooses the grid model. 
+ * chooses the grid model.
  */
 
 /* Guidelines for choosing the block or the grid model	*/
@@ -49,7 +54,7 @@
 /*     is desired.														                            */
 /*  2) Too many functional units are included in the floorplan, resulting */
 /*		 in extremely long computation time if using the Block Model        */
-/*	3) If temperature information is desired for many tiny units,		      */ 
+/*	3) If temperature information is desired for many tiny units,		      */
 /* 		 such as individual register file entry.						                */
 /**************************************************************************/
 /*	Comparisons between Grid Model and Block Model:						            */
@@ -82,7 +87,7 @@ void usage(int argc, char **argv)
   fprintf(stdout, "  [-detailed_3D <on/off]>\tHeterogeneous R-C assignments for specified layers. Requires a .lcf file to be specified\n"); //BU_3D: added detailed_3D option
 }
 
-/* 
+/*
  * parse a table of name-value string pairs and add the configuration
  * parameters to 'config'
  */
@@ -93,7 +98,8 @@ void global_config_from_strs(global_config_t *config, str_pair *table, int size)
       if(sscanf(table[idx].value, "%s", config->flp_file) != 1)
         fatal("invalid format for configuration  parameter flp_file\n");
   } else {
-      fatal("required parameter flp_file missing. check usage\n");
+      // If an LCF file is specified, an FLP file is not required
+      strcpy(config->flp_file, NULLFILE);
   }
   if ((idx = get_str_index(table, size, "p")) >= 0) {
       if(sscanf(table[idx].value, "%s", config->p_infile) != 1)
@@ -120,20 +126,32 @@ void global_config_from_strs(global_config_t *config, str_pair *table, int size)
       strcpy(config->dump_config, NULLFILE);
   }
   if ((idx = get_str_index(table, size, "detailed_3D")) >= 0) {
-      if(sscanf(table[idx].value, "%s", config->detailed_3D) != 1)	
+      if(sscanf(table[idx].value, "%s", config->detailed_3D) != 1)
         fatal("invalid format for configuration  parameter lc\n");
   } else {
       strcpy(config->detailed_3D, "off");
   }
+  if ((idx = get_str_index(table, size, "use_microchannels")) >= 0) {
+      if(sscanf(table[idx].value, "%d", &config->use_microchannels) != 1)
+        fatal("invalid format for configuration  parameter use_microchannels\n");
+  } else {
+      config->use_microchannels = 0;
+  }
+  if ((idx = get_str_index(table, size, "materials_file")) >= 0) {
+      if(sscanf(table[idx].value, "%s", config->materials_file) != 1)
+        fatal("invalid format for configuration parameter materials_file\n");
+  } else {
+      strcpy(config->materials_file, NULLFILE);
+  }
 }
 
-/* 
+/*
  * convert config into a table of name-value pairs. returns the no.
  * of parameters converted
  */
 int global_config_to_strs(global_config_t *config, str_pair *table, int max_entries)
 {
-  if (max_entries < 6)
+  if (max_entries < 8)
     fatal("not enough entries in table\n");
 
   sprintf(table[0].name, "f");
@@ -142,17 +160,22 @@ int global_config_to_strs(global_config_t *config, str_pair *table, int max_entr
   sprintf(table[3].name, "c");
   sprintf(table[4].name, "d");
   sprintf(table[5].name, "detailed_3D");
+  sprintf(table[6].name, "use_microchannels");
+  sprintf(table[7].name, "materials_file");
+
   sprintf(table[0].value, "%s", config->flp_file);
   sprintf(table[1].value, "%s", config->p_infile);
   sprintf(table[2].value, "%s", config->t_outfile);
   sprintf(table[3].value, "%s", config->config);
   sprintf(table[4].value, "%s", config->dump_config);
   sprintf(table[5].value, "%s", config->detailed_3D);
+  sprintf(table[6].value, "%d", config->use_microchannels);
+  sprintf(table[7].value, "%s", config->materials_file);
 
-  return 6;
+  return 8;
 }
 
-/* 
+/*
  * read a single line of trace file containing names
  * of functional blocks
  */
@@ -171,7 +194,7 @@ int read_names(FILE *fp, char **names)
       src = strtok(temp, " \r\t\n");
   } while (!src);
 
-  /* new line not read yet	*/	
+  /* new line not read yet	*/
   if(line[strlen(line)-1] != '\n')
     fatal("line too long\n");
 
@@ -205,7 +228,7 @@ int read_vals(FILE *fp, double *vals)
       src = strtok(temp, " \r\t\n");
   } while (!src);
 
-  /* new line not read yet	*/	
+  /* new line not read yet	*/
   if(line[strlen(line)-1] != '\n')
     fatal("line too long\n");
 
@@ -237,8 +260,8 @@ void write_vals(FILE *fp, double *vals, int size)
 {
   int i;
   for(i=0; i < size-1; i++)
-    fprintf(fp, "%.2f\t", vals[i]-273.15);
-  fprintf(fp, "%.2f\n", vals[i]-273.15);
+    fprintf(fp, "%.2f\t", vals[i]);
+  fprintf(fp, "%.2f\n", vals[i]);
 }
 
 char **alloc_names(int nr, int nc)
@@ -263,16 +286,72 @@ void free_names(char **m)
   free(m);
 }
 
-/* 
+void print_dashed_line(int length) {
+  int i;
+  for(i = 0; i < length; i++)
+    printf("-");
+  printf("\n");
+}
+
+#if VERBOSE>1
+// TODO: Support summary for modeling secondary paths and for non-3D simulations
+void print_simulation_summary(thermal_config_t thermal_config, RC_model_t *model) {
+  // This is currently only supported for 3D simulations
+  if(model->type != GRID_MODEL)
+    return;
+
+  grid_model_t *grid_model = model->grid;
+  int i;
+  int nl = grid_model->n_layers;
+  int hsidx = nl - DEFAULT_PACK_LAYERS + LAYER_SINK;
+  int spidx = nl - DEFAULT_PACK_LAYERS + LAYER_SP;
+  int intidx = LAYER_INT; // if lcf is not specified
+  int silidx = LAYER_SI; // if lcf is not specified
+
+  printf("\n\nSimulation Summary:\n");
+  print_dashed_line(25);
+  printf("Ambient at %.2f K\n", thermal_config.ambient);
+  print_dashed_line(25);
+
+  for(i = grid_model->n_layers - 1; i >= 0; i--) {
+    if(i == hsidx)
+      printf("Heat Sink : %.2f mm\n", grid_model->layers[i].thickness * 1e3);
+    else if(i == spidx)
+      printf("Heat Spreader : %.2f mm\n", grid_model->layers[i].thickness * 1e3);
+    else if(i == intidx && !grid_model->has_lcf)
+      printf("TIM : %.2f um\n", grid_model->layers[i].thickness * 1e6);
+    else if(i == silidx && !grid_model->has_lcf)
+      printf(" Chip : %.2f um\n", grid_model->layers[i].thickness * 1e6);
+    else if(grid_model->has_lcf)
+      printf("Layer %d : %.2f um\n", grid_model->layers[i].no, grid_model->layers[i].thickness * 1e6);
+    else
+      fatal("Unexpected error in print_simulation_summary\n");
+
+    printf("  conductivity = %lf W/(m-K)\n", grid_model->layers[i].k);
+    printf("  vol. heat capacity = %lf J/(m^3-K)\n", grid_model->layers[i].sp);
+
+    if(grid_model->layers[i].has_power)
+      printf("  dissipates power\n");
+
+    if(grid_model->layers[i].is_microchannel)
+      printf("  microfluidic cooling layer\n");
+
+    print_dashed_line(25);
+  }
+  printf("\n\n");
+}
+#endif
+
+/*
  * main function - reads instantaneous power values (in W) from a trace
- * file (e.g. "gcc.ptrace") and outputs instantaneous temperature values (in C) to
+ * file (e.g. "gcc.ptrace") and outputs instantaneous temperature values (in K) to
  * a trace file("gcc.ttrace"). also outputs steady state temperature values
  * (including those of the internal nodes of the model) onto stdout. the
  * trace files are 2-d matrices with each column representing a functional
  * functional block and each row representing a time unit(sampling_intvl).
  * columns are tab-separated and each row is a separate line. the first
  * line contains the names of the functional blocks. the order in which
- * the columns are specified doesn't have to match that of the floorplan 
+ * the columns are specified doesn't have to match that of the floorplan
  * file.
  */
 int main(int argc, char **argv)
@@ -295,24 +374,30 @@ int main(int argc, char **argv)
   double *overall_power, *steady_temp;
   /* thermal model configuration parameters	*/
   thermal_config_t thermal_config;
+  /* default microchannel parameters */
+  microchannel_config_t *microchannel_config = malloc(sizeof(microchannel_config_t));
   /* global configuration parameters	*/
   global_config_t global_config;
   /* table to hold options and configuration */
   str_pair table[MAX_ENTRIES];
+  /* material properties */
+  materials_list_t materials_list;
 
   /* variables for natural convection iterations */
-  int natural = 0; 
+  int natural = 0;
   double avg_sink_temp = 0;
   int natural_convergence = 0;
   double r_convec_old;
 
   /*BU_3D: variable for heterogenous R-C model */
   int do_detailed_3D = FALSE; //BU_3D: do_detailed_3D, false by default
+  int use_microchannels = FALSE;
   if (!(argc >= 5 && argc % 2)) {
       usage(argc, argv);
       return 1;
   }
 
+  printf("Parsing input files...\n");
   size = parse_cmdline(table, MAX_ENTRIES, argc, argv);
   global_config_from_strs(&global_config, table, size);
 
@@ -324,8 +409,8 @@ int main(int argc, char **argv)
   if (strcmp(global_config.config, NULLFILE))
     size += read_str_pairs(&table[size], MAX_ENTRIES, global_config.config);
 
-  /* earlier entries override later ones. so, command line options 
-   * have priority over config file 
+  /* earlier entries override later ones. so, command line options
+   * have priority over config file
    */
   size = str_pairs_remove_duplicates(table, size);
 
@@ -334,13 +419,32 @@ int main(int argc, char **argv)
       do_detailed_3D = TRUE;
   }
   else if(strcmp(global_config.detailed_3D, "off")){
-      fatal("detailed_3D parameter should be either \'on\' or \'off\'\n");
+      //fatal("detailed_3D parameter should be either \'on\' or \'off\'\n");
+      do_detailed_3D = FALSE;
   }//end->BU_3D
+
+  // fill in material properties
+  default_materials(&materials_list);
+  if(strncmp(global_config.materials_file, NULLFILE, STR_SIZE)) {
+    materials_add_from_file(&materials_list, global_config.materials_file);
+  }
 
   /* get defaults */
   thermal_config = default_thermal_config();
   /* modify according to command line / config file	*/
-  thermal_config_add_from_strs(&thermal_config, table, size);
+  thermal_config_add_from_strs(&thermal_config, &materials_list, table, size);
+
+  use_microchannels = global_config.use_microchannels;
+  if(use_microchannels) {
+    /* default microchannel config */
+    *microchannel_config = default_microchannel_config();
+
+    /* modify according to command line config file */
+    microchannel_config_add_from_strs(microchannel_config, &materials_list, table, size);
+  }
+  else {
+    microchannel_config = NULL;
+  }
 
   /* if package model is used, run package model */
   if (((idx = get_str_index(table, size, "package_model_used")) >= 0) && !(table[idx].value==0)) {
@@ -348,7 +452,7 @@ int main(int argc, char **argv)
           avg_sink_temp = thermal_config.ambient + SMALL_FOR_CONVEC;
           natural = package_model(&thermal_config, table, size, avg_sink_temp);
           if (thermal_config.r_convec<R_CONVEC_LOW || thermal_config.r_convec>R_CONVEC_HIGH)
-            printf("Warning: Heatsink convection resistance is not realistic, double-check your package settings...\n"); 
+            printf("Warning: Heatsink convection resistance is not realistic, double-check your package settings...\n");
       }
   }
 
@@ -356,24 +460,55 @@ int main(int argc, char **argv)
   if (strcmp(global_config.dump_config, NULLFILE)) {
       size = global_config_to_strs(&global_config, table, MAX_ENTRIES);
       size += thermal_config_to_strs(&thermal_config, &table[size], MAX_ENTRIES-size);
+      if(use_microchannels)
+        size += microchannel_config_to_strs(microchannel_config, &table[size], MAX_ENTRIES-size);
       /* prefix the name of the variable with a '-'	*/
       dump_str_pairs(table, size, global_config.dump_config, "-");
   }
 
-  /* initialization: the flp_file global configuration 
-   * parameter is overridden by the layer configuration 
+  /* initialization: the flp_file global configuration
+   * parameter is overridden by the layer configuration
    * file in the grid model when the latter is specified.
    */
-  flp = read_flp(global_config.flp_file, FALSE);
+  if(strcmp(thermal_config.grid_layer_file, NULLFILE)) {
+    flp = NULL;
+
+    if(strcmp(global_config.flp_file, NULLFILE)) {
+      fprintf(stderr, "Warning: Layer Configuration File %s specified. Overriding floorplan file %s\n", thermal_config.grid_layer_file, global_config.flp_file);
+    }
+  }
+  else if(strcmp(global_config.flp_file, NULLFILE)) {
+    flp = read_flp(global_config.flp_file, FALSE, FALSE);
+  }
+  else {
+    fatal("Either LCF or FLP file must be specified\n");
+  }
 
   //BU_3D: added do_detailed_3D to alloc_RC_model. Detailed 3D modeling can only be used with grid-level modeling.
   /* allocate and initialize the RC model	*/
-  model = alloc_RC_model(&thermal_config, flp, do_detailed_3D); 
-  if (model->type == BLOCK_MODEL && do_detailed_3D) 
-    fatal("Detailed 3D option can only be used with grid model\n"); //end->BU_3D
-  if ((model->type == GRID_MODEL) && !model->grid->has_lcf && do_detailed_3D) 
-    fatal("Detailed 3D option can only be used in 3D mode\n");
+  model = alloc_RC_model(&thermal_config, flp, microchannel_config, &materials_list, do_detailed_3D, use_microchannels);
 
+  // Do some error checking on combination of inputs
+  if (model->type != GRID_MODEL && do_detailed_3D)
+    fatal("-do_detailed_3D can only be used with -model_type grid\n"); //end->BU_3D
+  if (model->type == GRID_MODEL && !model->grid->has_lcf && do_detailed_3D)
+    fatal("-do_detailed_3D can only be used in 3D mode (if a grid_layer_file is specified)\n");
+  if (use_microchannels && (model->type != GRID_MODEL || !do_detailed_3D))
+    fatal("-use_microchannels requires -model_type grid and do_detailed_3D on options\n");
+  if(model->type != GRID_MODEL && strcmp(model->config->grid_steady_file, NULLFILE)) {
+    warning("Ignoring -grid_steady_file because grid model is not being used\n");
+    strcpy(model->config->grid_steady_file, NULLFILE);
+  }
+  if(model->type != GRID_MODEL && strcmp(model->config->grid_transient_file, NULLFILE)) {
+    warning("Ignoring -grid_transient_file because grid model is not being used\n");
+    strcpy(model->config->grid_transient_file, NULLFILE);
+  }
+
+#if VERBOSE > 1
+  print_simulation_summary(thermal_config, model);
+#endif
+
+  printf("Creating thermal circuit...\n");
   populate_R_model(model, flp);
 
   if (do_transient)
@@ -400,10 +535,11 @@ int main(int argc, char **argv)
   } else if (do_transient)	/* no input file - use init_temp as the common temperature	*/
     set_temp(model, temp, model->config->init_temp);
 
+
   /* n is the number of functional blocks in the block model
    * while it is the sum total of the number of functional blocks
-   * of all the floorplans in the power dissipating layers of the 
-   * grid model. 
+   * of all the floorplans in the power dissipating layers of the
+   * grid model.
    */
   if (model->type == BLOCK_MODEL)
     n = model->block->flp->n_units;
@@ -411,7 +547,7 @@ int main(int argc, char **argv)
       for(i=0; i < model->grid->n_layers; i++)
         if (model->grid->layers[i].has_power)
           n += model->grid->layers[i].flp->n_units;
-  } else 
+  } else
     fatal("unknown model type\n");
 
   if(!(pin = fopen(global_config.p_infile, "r")))
@@ -446,8 +582,8 @@ int main(int argc, char **argv)
                     power[base+idx] = vals[count+j];
                 }
                 count += model->grid->layers[i].flp->n_units;
-            }	
-            base += model->grid->layers[i].flp->n_units;	
+            }
+            base += model->grid->layers[i].flp->n_units;
         }
 
       /* compute temperature	*/
@@ -458,10 +594,13 @@ int main(int argc, char **argv)
               natural = package_model(model->config, table, size, avg_sink_temp);
               populate_R_model(model, flp);
           }
+
+          printf("Computing temperatures for t = %e...\n", lines*model->config->sampling_intvl);
+
           /* for the grid model, only the first call to compute_temp
-           * passes a non-null 'temp' array. if 'temp' is  NULL, 
-           * compute_temp remembers it from the last non-null call. 
-           * this is used to maintain the internal grid temperatures 
+           * passes a non-null 'temp' array. if 'temp' is  NULL,
+           * compute_temp remembers it from the last non-null call.
+           * this is used to maintain the internal grid temperatures
            * across multiple calls of compute_temp
            */
           if (model->type == BLOCK_MODEL || lines == 0)
@@ -469,6 +608,11 @@ int main(int argc, char **argv)
           else
             compute_temp(model, power, NULL, model->config->sampling_intvl);
 
+
+        // Print grid transient temperatures to file if one has been specified
+        if(model->type == GRID_MODEL && strcmp(model->config->grid_transient_file, NULLFILE)) {
+          dump_transient_temp_grid(model->grid, lines, model->config->sampling_intvl, model->config->grid_transient_file);
+        }
           /* permute back to the trace file order	*/
           if (model->type == BLOCK_MODEL)
             for(i=0; i < n; i++)
@@ -480,14 +624,13 @@ int main(int argc, char **argv)
                         idx = get_blk_index(model->grid->layers[i].flp, names[count+j]);
                         vals[count+j] = temp[base+idx];
                     }
-                    count += model->grid->layers[i].flp->n_units;	
-                }	
-                base += model->grid->layers[i].flp->n_units;	
+                    count += model->grid->layers[i].flp->n_units;
+                }
+                base += model->grid->layers[i].flp->n_units;
             }
-
           /* output instantaneous temperature trace	*/
           write_vals(tout, vals, n);
-      }		
+      }
 
       /* for computing average	*/
       if (model->type == BLOCK_MODEL)
@@ -498,12 +641,11 @@ int main(int argc, char **argv)
             if(model->grid->layers[i].has_power)
               for(j=0; j < model->grid->layers[i].flp->n_units; j++)
                 overall_power[base+j] += power[base+j];
-            base += model->grid->layers[i].flp->n_units;	
+            base += model->grid->layers[i].flp->n_units;
         }
 
       lines++;
   }
-
   if(!lines)
     fatal("no power numbers in trace file\n");
 
@@ -520,10 +662,9 @@ int main(int argc, char **argv)
               overall_power[base+j] /= lines;
               total_power += overall_power[base+j];
           }
-        base += model->grid->layers[i].flp->n_units;	
+        base += model->grid->layers[i].flp->n_units;
     }
-
-  /* natural convection r_convec iteration, for steady-state only */ 		
+  /* natural convection r_convec iteration, for steady-state only */
   natural_convergence = 0;
   if (natural) { /* natural convection is used */
       while (!natural_convergence) {
@@ -535,30 +676,24 @@ int main(int argc, char **argv)
           populate_R_model(model, flp);
           if (avg_sink_temp > MAX_SINK_TEMP)
             fatal("too high power for a natural convection package -- possible thermal runaway\n");
-          if (fabs(model->config->r_convec-r_convec_old)<NATURAL_CONVEC_TOL) 
+          if (fabs(model->config->r_convec-r_convec_old)<NATURAL_CONVEC_TOL)
             natural_convergence = 1;
       }
-  }	else /* natural convection is not used, no need for iterations */
-    /* steady state temperature	*/
-    steady_state_temp(model, overall_power, steady_temp);
-
-  /* print steady state results	*/
-  //BU_3D: Only print steady state results to stdout when DEBUG3D flag is not set
-#if DEBUG3D < 1
-  fprintf(stdout, "Unit\tSteady(Kelvin)\n");
-  dump_temp(model, steady_temp, "stdout");
-#endif //end->BU_3D
+  }	else {/* natural convection is not used, no need for iterations */
+      fprintf(stderr, "Computing steady-state temperatures...\n");
+      steady_state_temp(model, overall_power, steady_temp);
+    }
 
   /* dump steady state temperatures on to file if needed	*/
   if (strcmp(model->config->steady_file, NULLFILE))
     dump_temp(model, steady_temp, model->config->steady_file);
-
-  /* for the grid model, optionally dump the most recent 
-   * steady state temperatures of the grid cells	
+  /* for the grid model, optionally dump the most recent
+   * steady state temperatures of the grid cells
    */
   if (model->type == GRID_MODEL &&
       strcmp(model->config->grid_steady_file, NULLFILE))
     dump_steady_temp_grid(model->grid, model->config->grid_steady_file);
+
 
 #if VERBOSE > 2
   if (model->type == BLOCK_MODEL) {
@@ -582,15 +717,19 @@ int main(int argc, char **argv)
   fclose(pin);
   if (do_transient)
     fclose(tout);
+  if(!model->grid->has_lcf)
+    free_flp(flp, FALSE, FALSE);
   delete_RC_model(model);
-  free_flp(flp, FALSE);
   if (do_transient)
     free_dvector(temp);
+  free_materials(&materials_list);
+  free_microchannel(microchannel_config);
   free_dvector(power);
   free_dvector(steady_temp);
   free_dvector(overall_power);
   free_names(names);
   free_dvector(vals);
 
+  printf("Simulation complete.\n");
   return 0;
 }

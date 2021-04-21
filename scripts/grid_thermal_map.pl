@@ -24,16 +24,16 @@
 use strict;
 
 sub usage () {
-    print("usage: grid_thermal_map.pl <flp_file> <grid_temp_file> > <filename>.svg (or)\n");
-    print("       grid_thermal_map.pl <flp_file> <grid_temp_file> <rows> <cols> > <filename>.svg\n");
-    print("       grid_thermal_map.pl <flp_file> <grid_temp_file> <rows> <cols> <min> <max> > <filename>.svg\n");
+    print("usage: grid_thermal_map.pl <flp_file> <grid_steady_file> > <filename>.svg (or)\n");
+    print("       grid_thermal_map.pl <flp_file> <grid_steady_file> <rows> <cols> > <filename>.svg\n");
+    print("       grid_thermal_map.pl <flp_file> <grid_steady_file> <rows> <cols> <min> <max> > <filename>.svg\n");
 	print("prints an 'SVG' format visual thermal map to stdout\n");
-    print("<flp_file>       -- path to the file containing the floorplan (eg: ev6.flp)\n");
-    print("<grid_temp_file> -- path to the grid temperatures file (eg: sample.t)\n");
-    print("<rows>           -- no. of rows in the grid (default 64)\n");
-    print("<cols>           -- no. of columns in the grid (default 64)\n");
-    print("<min>            -- min. temperature of the scale (defaults to min. from <grid_temp_file>)\n");
-    print("<max>            -- max. temperature of the scale (defaults to max. from <grid_temp_file>)\n");
+    print("<flp_file>         -- path to the file containing the floorplan (eg: ev6.flp)\n");
+    print("<grid_steady_file> -- path to the grid temperatures file (eg: sample.grid.steady)\n");
+    print("<rows>             -- no. of rows in the grid (default 64)\n");
+    print("<cols>             -- no. of columns in the grid (default 64)\n");
+    print("<min>              -- min. temperature of the scale (defaults to min. from <grid_temp_file>)\n");
+    print("<max>              -- max. temperature of the scale (defaults to max. from <grid_temp_file>)\n");
     exit(1);
 }
 

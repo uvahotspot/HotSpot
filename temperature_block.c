@@ -12,8 +12,8 @@
 #include "flp.h"
 #include "util.h"
 
-/* 
- * allocate memory for the matrices. placeholder can be an empty 
+/*
+ * allocate memory for the matrices. placeholder can be an empty
  * floorplan frame with only the names of the functional units
  */
 block_model_t *alloc_block_model(thermal_config_t *config, flp_t *placeholder)
@@ -56,9 +56,9 @@ block_model_t *alloc_block_model(thermal_config_t *config, flp_t *placeholder)
 	return model;
 }
 
-/* creates matrices  B and invB: BT = Power in the steady state. 
- * NOTE: EXTRA nodes: 4 heat spreader peripheral nodes, 4 heat 
- * sink inner peripheral nodes, 4 heat sink outer peripheral 
+/* creates matrices  B and invB: BT = Power in the steady state.
+ * NOTE: EXTRA nodes: 4 heat spreader peripheral nodes, 4 heat
+ * sink inner peripheral nodes, 4 heat sink outer peripheral
  * nodes(north, south, east and west) and 1 ambient node.
  */
 void populate_R_model_block(block_model_t *model, flp_t *flp)
@@ -84,7 +84,7 @@ void populate_R_model_block(block_model_t *model, flp_t *flp)
 	double k_sink = model->config.k_sink;
 	double k_spreader = model->config.k_spreader;
 	double k_interface = model->config.k_interface;
-	
+
 	int i, j, n = flp->n_units;
 	double gn_sp=0, gs_sp=0, ge_sp=0, gw_sp=0;
 	double gn_hs=0, gs_hs=0, ge_hs=0, gw_hs=0;
@@ -92,11 +92,11 @@ void populate_R_model_block(block_model_t *model, flp_t *flp)
 
 	double w_chip = get_total_width (flp);	/* x-axis	*/
 	double l_chip = get_total_height (flp);	/* y-axis	*/
-	
+
 	/* sanity check on floorplan sizes	*/
-	if (w_chip > s_sink || l_chip > s_sink || 
+	if (w_chip > s_sink || l_chip > s_sink ||
 		w_chip > s_spreader || l_chip > s_spreader) {
-		print_flp(flp);
+		print_flp(flp, FALSE);
 		print_flp_fig(flp);
 		fatal("inordinate floorplan size!\n");
 	}
@@ -129,8 +129,8 @@ void populate_R_model_block(block_model_t *model, flp_t *flp)
 	}
 
 	/* shared lengths between blocks	*/
-	for (i = 0; i < n; i++) 
-		for (j = i; j < n; j++) 
+	for (i = 0; i < n; i++)
+		for (j = i; j < n; j++)
 			len[i][j] = len[j][i] = get_shared_len(flp, i, j);
 
 	/* package R's	*/
@@ -156,7 +156,7 @@ void populate_R_model_block(block_model_t *model, flp_t *flp)
 			ge_sp += gx_sp[i];
 			ge_hs += gx_hs[i];
 			border[i][1] = 1;	/* block is on eastern border	*/
-		} else 
+		} else
 			border[i][1] = 0;
 
 		if (eq(flp->units[i].leftx, 0)) {
@@ -194,7 +194,7 @@ void populate_R_model_block(block_model_t *model, flp_t *flp)
 			g[HSP*n+i][HSP*n+j] = part_sp * len[i][j];
 			g[HSINK*n+i][HSINK*n+j] = part_hs * len[i][j];
 		}
-		/* the 2.0 factor in the following equations is 
+		/* the 2.0 factor in the following equations is
 		 * explained during the calculation of the B matrix
 		 */
  		/* vertical g's in the silicon layer	*/
@@ -217,7 +217,7 @@ void populate_R_model_block(block_model_t *model, flp_t *flp)
 							  ((1.0/gx_sp[i])+model->pack.r_sp1_x*ge_sp/gx_sp[i]);
 		g[HSP*n+i][NL*n+SP_W]=g[NL*n+SP_W][HSP*n+i]=2.0*border[i][0] /
 							  ((1.0/gx_sp[i])+model->pack.r_sp1_x*gw_sp/gx_sp[i]);
-		
+
 		/* lateral g's from block center (heatsink layer) to peripheral (n,s,e,w) heatsink nodes	*/
 		g[HSINK*n+i][NL*n+SINK_C_N]=g[NL*n+SINK_C_N][HSINK*n+i]=2.0*border[i][2] /
 									((1.0/gy_hs[i])+model->pack.r_hs1_y*gn_hs/gy_hs[i]);
@@ -256,18 +256,18 @@ void populate_R_model_block(block_model_t *model, flp_t *flp)
 			else
 				/* here is why the 2.0 factor comes when calculating g[][]	*/
 				b[i][j] = b[j][i] = -1.0/((1.0/g[i][j])+(1.0/g[j][i]));
-	/* diagonal elements	*/			
+	/* diagonal elements	*/
 	for (i = 0; i < NL*n+EXTRA; i++) {
 		/* functional blocks in the heat sink layer	*/
-		if (i >= HSINK*n && i < NL*n) 
+		if (i >= HSINK*n && i < NL*n)
 			b[i][i] = g_amb[i%n];
 		/* heat sink peripheral nodes	*/
 		else if (i >= NL*n+SINK_C_W)
 			b[i][i] = g_amb[n+i-NL*n];
-		/* all other nodes that are not connected to the ambient	*/	
+		/* all other nodes that are not connected to the ambient	*/
 		else
 			b[i][i] = 0.0;
-		/* sum up the conductances	*/	
+		/* sum up the conductances	*/
 		for(j=0; j < NL*n+EXTRA; j++)
 			if (i != j)
 				b[i][i] -= b[i][j];
@@ -275,17 +275,17 @@ void populate_R_model_block(block_model_t *model, flp_t *flp)
 
 	/* compute the LUP decomposition of B and store it too	*/
 	copy_dmatrix(lu, b, NL*n+EXTRA, NL*n+EXTRA);
-	/* 
+	/*
 	 * B is a symmetric positive definite matrix. It is
-	 * symmetric because if a node A is connected to B, 
+	 * symmetric because if a node A is connected to B,
 	 * then B is also connected to A with the same R value.
 	 * It is positive definite because of the following
 	 * informal argument from Professor Lieven Vandenberghe's
-	 * lecture slides for the spring 2004-2005 EE 103 class 
+	 * lecture slides for the spring 2004-2005 EE 103 class
 	 * at UCLA: http://www.ee.ucla.edu/~vandenbe/103/chol.pdf
 	 * x^T*B*x = voltage^T * (B*x) = voltage^T * current
-	 * = total power dissipated in the resistors > 0 
-	 * for x != 0. 
+	 * = total power dissipated in the resistors > 0
+	 * for x != 0.
 	 */
 	lupdcmp(lu, NL*n+EXTRA, p, 1);
 
@@ -294,11 +294,11 @@ void populate_R_model_block(block_model_t *model, flp_t *flp)
 	model->r_ready = TRUE;
 }
 
-/* creates 2 matrices: invA, C: dT + A^-1*BT = A^-1*Power, 
+/* creates 2 matrices: invA, C: dT + A^-1*BT = A^-1*Power,
  * C = A^-1 * B. note that A is a diagonal matrix (no lateral
  * capacitances. all capacitances are to ground). also note that
- * it is stored as a 1-d vector. so, for computing the inverse, 
- * inva[i] = 1/a[i] is just enough. 
+ * it is stored as a 1-d vector. so, for computing the inverse,
+ * inva[i] = 1/a[i] is just enough.
  */
 void populate_C_model_block(block_model_t *model, flp_t *flp)
 {
@@ -326,13 +326,13 @@ void populate_C_model_block(block_model_t *model, flp_t *flp)
 	if (model->flp != flp || model->n_units != flp->n_units ||
 		model->n_nodes != NL * flp->n_units + EXTRA)
 		fatal("different floorplans for R and C models!\n");
-		
+
 	w_chip = get_total_width (flp);	/* x-axis	*/
 	l_chip = get_total_height (flp);	/* y-axis	*/
 
 	/* package C's	*/
 	populate_package_C(&model->pack, &model->config, w_chip, l_chip);
-	
+
 	/* functional block C's */
 	for (i = 0; i < n; i++) {
 		double area = (flp->units[i].height * flp->units[i].width);
@@ -353,20 +353,20 @@ void populate_C_model_block(block_model_t *model, flp_t *flp)
 	a[NL*n+SP_N] = a[NL*n+SP_S] = model->pack.c_sp_per_y;
 	a[NL*n+SP_E] = a[NL*n+SP_W] = model->pack.c_sp_per_x;
  	/* from center peripheral sink nodes to ground
-	 * NOTE: this treatment of capacitances (and 
-	 * the corresponding treatment of resistances 
+	 * NOTE: this treatment of capacitances (and
+	 * the corresponding treatment of resistances
 	 * in populate_R_model) as parallel (series)
 	 * is only approximate and is done in order
 	 * to avoid creating an extra layer of nodes
 	 */
-	a[NL*n+SINK_C_N] = a[NL*n+SINK_C_S] = model->pack.c_hs_c_per_y + 
+	a[NL*n+SINK_C_N] = a[NL*n+SINK_C_S] = model->pack.c_hs_c_per_y +
 										  model->pack.c_amb_c_per_y;
-	a[NL*n+SINK_C_E] = a[NL*n+SINK_C_W] = model->pack.c_hs_c_per_x + 
-										  model->pack.c_amb_c_per_x; 
+	a[NL*n+SINK_C_E] = a[NL*n+SINK_C_W] = model->pack.c_hs_c_per_x +
+										  model->pack.c_amb_c_per_x;
 	/* from outer peripheral sink nodes to ground	*/
-	a[NL*n+SINK_N] = a[NL*n+SINK_S] = a[NL*n+SINK_E] = a[NL*n+SINK_W] = 
+	a[NL*n+SINK_N] = a[NL*n+SINK_S] = a[NL*n+SINK_E] = a[NL*n+SINK_W] =
 					 model->pack.c_hs_per + model->pack.c_amb_per;
-	
+
 	/* calculate A^-1 (for diagonal matrix A) such that A(dT) + BT = POWER */
 	for (i = 0; i < NL*n+EXTRA; i++)
 		inva[i] = 1.0/a[i];
@@ -388,14 +388,14 @@ void set_internal_power_block(block_model_t *model, double *power)
 		power[HSINK*model->n_units+i] = model->config.ambient * model->g_amb[i];
 }
 
-/* power and temp should both be alloced using hotspot_vector. 
+/* power and temp should both be alloced using hotspot_vector.
  * 'b' is the 'thermal conductance' matrix. i.e, b * temp = power
  *  => temp = invb * power. instead of computing invb, we have
  * stored the LUP decomposition of B in 'lu' and 'p'. Using
- * forward and backward substitution, we can then solve the 
+ * forward and backward substitution, we can then solve the
  * equation b * temp = power.
  */
-void steady_state_temp_block(block_model_t *model, double *power, double *temp) 
+void steady_state_temp_block(block_model_t *model, double *power, double *temp)
 {
 	if (!model->r_ready)
 		fatal("R model not ready\n");
@@ -403,14 +403,14 @@ void steady_state_temp_block(block_model_t *model, double *power, double *temp)
 	/* set power numbers for the virtual nodes */
 	set_internal_power_block(model, power);
 
-	/* 
+	/*
 	 * find temperatures (spd flag is set to 1 by the same argument
 	 * as mentioned in the populate_R_model_block function)
 	 */
 	lusolve(model->lu, model->n_nodes, model->p, power, temp, 1);
 }
 
-/* compute the slope vector dy for the transient equation 
+/* compute the slope vector dy for the transient equation
  * dy + cy = p. useful in the transient solver
  */
 void slope_fn_block(block_model_t *model, double *y, double *p, double *dy)
@@ -441,8 +441,8 @@ void slope_fn_block(block_model_t *model, double *y, double *p, double *dy)
 	#endif
 }
 
-/* compute_temp: solve for temperature from the equation dT + CT = inv_A * Power 
- * Given the temperature (temp) at time t, the power dissipation per cycle during the 
+/* compute_temp: solve for temperature from the equation dT + CT = inv_A * Power
+ * Given the temperature (temp) at time t, the power dissipation per cycle during the
  * last interval (time_elapsed), find the new temperature at time t+time_elapsed.
  * power and temp should both be alloced using hotspot_vector
  */
@@ -465,14 +465,14 @@ void compute_temp_block(block_model_t *model, double *power, double *temp, doubl
 	/* use the scratch pad vector to find (inv_A)*POWER */
 	diagmatvectmult(model->t_vector, model->inva, power, model->n_nodes);
 
-	/* Obtain temp at time (t+time_elapsed). 
-	 * Instead of getting the temperature at t+time_elapsed directly, we do it 
-	 * in multiple steps with the correct step size at each time 
+	/* Obtain temp at time (t+time_elapsed).
+	 * Instead of getting the temperature at t+time_elapsed directly, we do it
+	 * in multiple steps with the correct step size at each time
 	 * provided by rk4
 	 */
 	for (t = 0, new_h = MIN_STEP; t < time_elapsed && new_h >= MIN_STEP*DELTA; t+=h) {
 		h = new_h;
-		new_h = rk4(model, temp, model->t_vector, model->n_nodes, &h, 
+		new_h = rk4(model, temp, model->t_vector, model->n_nodes, &h,
 		/* the slope function callback is typecast accordingly */
 					temp, (slope_fn_ptr) slope_fn_block);
 		new_h = MIN(new_h, time_elapsed-t-h);
@@ -495,7 +495,7 @@ double *hotspot_vector_block(block_model_t *model)
  * elements starting at 'at'. useful in floorplan
  * compaction
  */
-void trim_hotspot_vector_block(block_model_t *model, double *dst, double *src, 
+void trim_hotspot_vector_block(block_model_t *model, double *dst, double *src,
 						 	   int at, int size)
 {
 	int i;
@@ -506,7 +506,7 @@ void trim_hotspot_vector_block(block_model_t *model, double *dst, double *src,
 		dst[i-size] = src[i];
 }
 
-/* update the model's node count	*/						 
+/* update the model's node count	*/
 void resize_thermal_model_block(block_model_t *model, int n_units)
 {
 	if (n_units > model->base_n_units)
@@ -529,7 +529,7 @@ void set_temp_block(block_model_t *model, double *temp, double val)
 		temp[i] = val;
 }
 
-/* dump temperature vector alloced using 'hotspot_vector' to 'file' */ 
+/* dump temperature vector alloced using 'hotspot_vector' to 'file' */
 void dump_temp_block(block_model_t *model, double *temp, char *file)
 {
 	flp_t *flp = model->flp;
@@ -541,7 +541,7 @@ void dump_temp_block(block_model_t *model, double *temp, char *file)
 		fp = stdout;
 	else if (!strcasecmp(file, "stderr"))
 		fp = stderr;
-	else 	
+	else
 		fp = fopen (file, "w");
 
 	if (!fp) {
@@ -571,7 +571,7 @@ void dump_temp_block(block_model_t *model, double *temp, char *file)
 	}
 
 	if(fp != stdout && fp != stderr)
-		fclose(fp);	
+		fclose(fp);
 }
 
 void copy_temp_block(block_model_t *model, double *dst, double *src)
@@ -579,11 +579,11 @@ void copy_temp_block(block_model_t *model, double *dst, double *src)
 	copy_dvector(dst, src, NL*model->flp->n_units+EXTRA);
 }
 
-/* 
+/*
  * read temperature vector alloced using 'hotspot_vector' from 'file'
  * which was dumped using 'dump_temp'. values are clipped to thermal
  * threshold based on 'clip'
- */ 
+ */
 void read_temp_block(block_model_t *model, double *temp, char *file, int clip)
 {
 	/*	shortcuts	*/
@@ -605,7 +605,7 @@ void read_temp_block(block_model_t *model, double *temp, char *file, int clip)
 	if (!fp) {
 		sprintf (str1,"error: %s could not be opened for reading\n", file);
 		fatal(str1);
-	}	
+	}
 
 	/* temperatures of the different layers	*/
 	for (n=0; n < NL; n++) {
@@ -654,7 +654,7 @@ void read_temp_block(block_model_t *model, double *temp, char *file, int clip)
 		}
 	}
 
-	/* internal node temperatures	*/	
+	/* internal node temperatures	*/
 	for (i=0; i < EXTRA; i++) {
 		fgets(str1, LINE_SIZE, fp);
 		if (feof(fp))
@@ -671,7 +671,7 @@ void read_temp_block(block_model_t *model, double *temp, char *file, int clip)
 		sprintf(str1, "inode_%d", i);
 		if (strcasecmp(str1, name))
 			fatal("invalid temperature file format\n");
-		temp[i+NL*flp->n_units] = val;	
+		temp[i+NL*flp->n_units] = val;
 	}
 
 	fgets(str1, LINE_SIZE, fp);
@@ -679,15 +679,15 @@ void read_temp_block(block_model_t *model, double *temp, char *file, int clip)
 		fatal("too many lines in temperature file\n");
 
 	if(fp != stdin)
-		fclose(fp);	
+		fclose(fp);
 
 	/* clipping	*/
 	if (clip && (max > thermal_threshold)) {
-		/* if max has to be brought down to thermal_threshold, 
+		/* if max has to be brought down to thermal_threshold,
 		 * (w.r.t the ambient) what is the scale down factor?
 		 */
 		double factor = (thermal_threshold - ambient) / (max - ambient);
-	
+
 		/* scale down all temperature differences (from ambient) by the same factor	*/
 		for (i=0; i < NL*flp->n_units + EXTRA; i++)
 			temp[i] = (temp[i]-ambient)*factor + ambient;
@@ -706,7 +706,7 @@ void dump_power_block(block_model_t *model, double *power, char *file)
 		fp = stdout;
 	else if (!strcasecmp(file, "stderr"))
 		fp = stderr;
-	else 	
+	else
 		fp = fopen (file, "w");
 
 	if (!fp) {
@@ -716,13 +716,13 @@ void dump_power_block(block_model_t *model, double *power, char *file)
 	for (i=0; i < flp->n_units; i++)
 		fprintf(fp, "%s\t%.6f\n", flp->units[i].name, power[i]);
 	if(fp != stdout && fp != stderr)
-		fclose(fp);	
+		fclose(fp);
 }
 
-/* 
+/*
  * read power vector alloced using 'hotspot_vector' from 'file'
- * which was dumped using 'dump_power'. 
- */ 
+ * which was dumped using 'dump_power'.
+ */
 void read_power_block (block_model_t *model, double *power, char *file)
 {
 	flp_t *flp = model->flp;
@@ -784,7 +784,7 @@ double find_avg_temp_block(block_model_t *model, double *temp)
 	for(i=0; i < model->n_units; i++) {
 		if (temp[i] < 0)
 			fatal("negative temperature!\n");
-		else 
+		else
 			sum += temp[i];
 	}
 
@@ -801,14 +801,14 @@ double calc_sink_temp_block(block_model_t *model, double *temp, thermal_config_t
 	double height = get_total_height(flp);
 	double spr_size = config->s_spreader*config->s_spreader;
 	double sink_size = config->s_sink*config->s_sink;
-	
+
 	/* heatsink temperatures	*/
 	for (i=0; i < flp->n_units; i++)
 		if (temp[HSINK*flp->n_units+i] < 0)
 			fatal("negative temperature!\n");
 		else  /* area-weighted average */
 			sum += temp[HSINK*flp->n_units+i]*(flp->units[i].width*flp->units[i].height);
-			
+
 	for(i=SINK_C_W; i <= SINK_C_E; i++)
 		if (temp[i+NL*flp->n_units] < 0)
 			fatal("negative temperature!\n");
@@ -826,7 +826,7 @@ double calc_sink_temp_block(block_model_t *model, double *temp, thermal_config_t
 			fatal("negative temperature!\n");
 		else
 			sum += temp[i+NL*flp->n_units]*0.25*(sink_size-spr_size);
-	
+
 	return (sum / sink_size);
 }
 
@@ -880,4 +880,3 @@ void debug_print_block(block_model_t *model)
 	fprintf(stdout, "printing vector g_amb:\n");
 	dump_dvector(model->g_amb, model->n_units+EXTRA);
 }
-

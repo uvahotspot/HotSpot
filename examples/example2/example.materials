@@ -1,0 +1,23 @@
+# Format:
+#
+# material name
+# material type (solid or fluid)
+# thermal conductivity in W/(m-K)
+# volumetric heat capacity in J/(m^3-K)
+# dynamic viscosity in Pa-s (fluid only)
+
+silicon
+solid
+130.0
+1630300
+
+water
+fluid
+0.6069
+4172638
+8.89e-4
+
+aluminum
+solid
+237.0
+2.422e6
