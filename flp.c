@@ -17,20 +17,20 @@
 #include "temperature.h"
 #include "temperature_block.h"
 
-/* 
- * this is the metric function used for the floorplanning. 
- * in order to enable a different metric, just change the 
+/*
+ * this is the metric function used for the floorplanning.
+ * in order to enable a different metric, just change the
  * return statement of this function to return an appropriate
  * metric. The current metric used is a linear function of
  * area (A), temperature (T) and wire length (W):
  * lambdaA * A + lambdaT * T  + lambdaW * W
  * thermal model and power density are passed as parameters
- * since temperature is used in the metric. 
+ * since temperature is used in the metric.
  */
 double flp_evaluate_metric(flp_t *flp, RC_model_t *model, double *power,
 						   double lambdaA, double lambdaT, double lambdaW)
 {
-	double tmax, area, wire_length, width, height, aspect;
+	double tmax, area, wire_length;
 	double *temp;
 
 	temp = hotspot_vector(model);
@@ -39,12 +39,6 @@ double flp_evaluate_metric(flp_t *flp, RC_model_t *model, double *power,
 	tmax = find_max_temp(model, temp);
 	area = get_total_area(flp);
 	wire_length = get_wire_metric(flp);
-	width = get_total_width(flp);
-	height = get_total_height(flp);
-	if (width > height)
-		aspect = width / height; 
-	else
-		aspect = height / width;
 	free_dvector(temp);
 
 	/* can return any arbitrary function of area, tmax and wire_length	*/
@@ -60,7 +54,7 @@ flp_config_t default_flp_config(void)
 	/* wrap around L2?	*/
 	config.wrap_l2 = TRUE;
 	strcpy(config.l2_label, "L2");
-	
+
 	/* model dead space around the rim of the chip? */
 	config.model_rim = FALSE;
 	config.rim_thickness = 50e-6;
@@ -68,22 +62,22 @@ flp_config_t default_flp_config(void)
 	/* area ratio below which to ignore dead space	*/
 	config.compact_ratio = 0.005;
 
-	/* 
+	/*
 	 * no. of discrete orientations for a shape curve.
 	 * should be an even number greater than 1
 	 */
 	config.n_orients = 300;
-	
+
 	/* annealing parameters	*/
 	config.P0 = 0.99;		/* initial acceptance probability	*/
-	/* 
+	/*
 	 * average change (delta) in cost. varies according to
 	 * the metric. need not be very accurate. just the right
 	 * order of magnitude is enough. for instance, if the
 	 * metric is flp area, this Davg is the average difference
 	 * in the area of successive slicing floorplan attempts.
 	 * since the areas are in the order of mm^2, the delta
-	 * is also in the same ball park. 
+	 * is also in the same ball park.
 	 */
 	config.Davg = 1.0;		/* for our a*A + b*T + c*W metric	*/
 	config.Kmoves = 7.0;	/* no. of moves to try in each step	*/
@@ -92,8 +86,8 @@ flp_config_t default_flp_config(void)
 	config.Nmax = 1000;		/* absolute max no. of annealing steps	*/
 
 	/* weights for the metric: lambdaA * A + lambdaT * T + lambdaW * W
-	 * the weights incorporate two things: 
-	 * 1) the conversion of A to mm^2, T to K and W to mm. 
+	 * the weights incorporate two things:
+	 * 1) the conversion of A to mm^2, T to K and W to mm.
 	 * 2) weighing the relative importance of A, T and K
 	 */
 	config.lambdaA = 5.0e+6;
@@ -103,7 +97,7 @@ flp_config_t default_flp_config(void)
 	return config;
 }
 
-/* 
+/*
  * parse a table of name-value string pairs and add the configuration
  * parameters to 'config'
  */
@@ -155,7 +149,7 @@ void flp_config_add_from_strs(flp_config_t *config, str_pair *table, int size)
 	if ((idx = get_str_index(table, size, "lambdaW")) >= 0)
 		if(sscanf(table[idx].value, "%lf", &config->lambdaW) != 1)
 			fatal("invalid format for configuration  parameter lambdaW\n");
-			
+
 	if (config->rim_thickness <= 0)
 		fatal("rim thickness should be greater than zero\n");
 	if ((config->compact_ratio < 0) || (config->compact_ratio > 1))
@@ -174,7 +168,7 @@ void flp_config_add_from_strs(flp_config_t *config, str_pair *table, int size)
 		fatal("Nmax should be non-negative\n");
 }
 
-/* 
+/*
  * convert config into a table of name-value pairs. returns the no.
  * of parameters converted
  */
@@ -218,9 +212,9 @@ int flp_config_to_strs(flp_config_t *config, str_pair *table, int max_entries)
 	return 15;
 }
 
-/* 
- * copy L2 connectivity from 'from' of flp_desc to 'to' 
- * of flp. 'size' elements are copied. the arms are not 
+/*
+ * copy L2 connectivity from 'from' of flp_desc to 'to'
+ * of flp. 'size' elements are copied. the arms are not
  * connected amidst themselves or with L2 base block
  */
 void copy_l2_info (flp_t *flp, int to, flp_desc_t *flp_desc, int from, int size)
@@ -233,12 +227,12 @@ void copy_l2_info (flp_t *flp, int to, flp_desc_t *flp_desc, int from, int size)
 		for(j=0; j < size; j++) {
 			/* rows	*/
 			flp->wire_density[to][j] = flp_desc->wire_density[from][j];
-			/* columns	*/	
+			/* columns	*/
 			flp->wire_density[j][to] = flp_desc->wire_density[j][from];
 		}
 	}
 	/* fix the names of the arms	*/
-	strcat(flp->units[to-L2_ARMS+L2_LEFT].name, L2_LEFT_STR);	
+	strcat(flp->units[to-L2_ARMS+L2_LEFT].name, L2_LEFT_STR);
 	strcat(flp->units[to-L2_ARMS+L2_RIGHT].name, L2_RIGHT_STR);
 }
 
@@ -251,28 +245,28 @@ flp_t *flp_placeholder(flp_desc_t *flp_desc)
 
 	/* wrap L2 around?	*/
 	int wrap_l2 = FALSE;
-	if (flp_desc->config.wrap_l2 && 
+	if (flp_desc->config.wrap_l2 &&
 		!strcasecmp(flp_desc->units[flp_desc->n_units-1].name, flp_desc->config.l2_label))
 		wrap_l2 = TRUE;
 
 	flp = (flp_t *) calloc (1, sizeof(flp_t));
 	if(!flp)
 		fatal("memory allocation error\n");
-	/* 
+	/*
 	 * number of dead blocks = no. of core blocks - 1.
-	 * (one per vertical or horizontal cut). if L2 is 
+	 * (one per vertical or horizontal cut). if L2 is
 	 * wrapped around, core blocks = flp_desc->n_units-1
 	 */
-	n_dead = flp_desc->n_units - !!(wrap_l2) - 1; 
+	n_dead = flp_desc->n_units - !!(wrap_l2) - 1;
 	flp->n_units = flp_desc->n_units + n_dead;
 
 	/* wrap L2 around - extra arms are added */
 	if (wrap_l2)
 		flp->n_units += L2_ARMS;
 
-	/* 
+	/*
 	 * model the dead space in the edge. let us make
-	 * one dead block per corner edge of a block. so, 
+	 * one dead block per corner edge of a block. so,
 	 * no. of rim blocks could be at most 2*n+2 where
 	 * n is the total no. of blocks (the worst case
 	 * is just all blocks lined up side-by-side)
@@ -309,12 +303,12 @@ flp_t *flp_placeholder(flp_desc_t *flp_desc)
 	return flp;
 }
 
-/* 
- * note that if wrap_l2 is true, L2 is beyond the boundary in flp_desc 
+/*
+ * note that if wrap_l2 is true, L2 is beyond the boundary in flp_desc
  * but flp contains it within its boundaries.
  */
-void restore_dead_blocks(flp_t *flp, flp_desc_t *flp_desc, 
-						 int compacted, int wrap_l2, 
+void restore_dead_blocks(flp_t *flp, flp_desc_t *flp_desc,
+						 int compacted, int wrap_l2,
 						 int model_rim, int rim_blocks)
 {
 	int i, j, idx=0;
@@ -376,7 +370,7 @@ void flp_scale(flp_t *flp, double factor)
 	}
 }
 
-/* 
+/*
  * change the orientation of the floorplan by
  * rotating and/or flipping. the target orientation
  * is specified in 'target'. 'width', 'height', 'xorig'
@@ -389,17 +383,17 @@ void flp_change_orient(flp_t *flp, double xorig, double yorig,
 
 	for(i=0; i < flp->n_units; i++) {
 		double leftx, bottomy, rightx, topy;
-		/* all co-ordinate calculations are 
-		 * done assuming (0,0) as the center. 
+		/* all co-ordinate calculations are
+		 * done assuming (0,0) as the center.
 		 * so, shift accordingly
 		 */
 		leftx = flp->units[i].leftx  - (xorig + width / 2.0);
 		bottomy = flp->units[i].bottomy - (yorig + height / 2.0);
 		rightx = leftx + flp->units[i].width;
 		topy = bottomy + flp->units[i].height;
-		/* when changing orientation, leftx and 
+		/* when changing orientation, leftx and
 		 * bottomy of a rectangle could change
-		 * to one of the other three corners. 
+		 * to one of the other three corners.
 		 * also, signs of the co-ordinates
 		 * change according to the rotation
 		 * or reflection. Further x & y are
@@ -453,7 +447,7 @@ void flp_change_orient(flp_t *flp, double xorig, double yorig,
 	}
 }
 
-/* 
+/*
  * create a non-uniform grid-like floorplan equivalent to this.
  * this function is mainly useful when using the HotSpot block
  * model to model floorplans of drastically differing aspect
@@ -462,9 +456,9 @@ void flp_change_orient(flp_t *flp, double xorig, double yorig,
  * where the register file is subdivided into say 128 entries.
  * the HotSpot block model could result in inaccuracies while
  * trying to model such floorplans of differing granularity.
- * if such inaccuracies occur, use this function to create an 
- * equivalent floorplan that can be modeled accurately in 
- * HotSpot. 'map', if non-NULL, is an output parameter to store 
+ * if such inaccuracies occur, use this function to create an
+ * equivalent floorplan that can be modeled accurately in
+ * HotSpot. 'map', if non-NULL, is an output parameter to store
  * the 2-d array allocated by the function.
  */
 flp_t *flp_create_grid(flp_t *flp, int ***map)
@@ -488,14 +482,14 @@ flp_t *flp_create_grid(flp_t *flp, int ***map)
 			ysize++;
 	}
 
-	/* 
+	/*
 	 * the grid formed by the lines from x and y arrays
 	 * is our desired floorplan. allocate memory for it
 	 */
 	grid = (flp_t *) calloc (1, sizeof(flp_t));
 	if(!grid)
 		fatal("memory allocation error\n");
-	grid->n_units = (xsize-1) * (ysize-1);	
+	grid->n_units = (xsize-1) * (ysize-1);
 	grid->units = (unit_t *) calloc (grid->n_units, sizeof(unit_t));
 	grid->wire_density = (double **) calloc(grid->n_units, sizeof(double *));
 	if (!grid->units || !grid->wire_density)
@@ -509,7 +503,7 @@ flp_t *flp_create_grid(flp_t *flp, int ***map)
 	ptr = (int **) calloc(flp->n_units, sizeof(int *));
 	if (!ptr)
 		fatal("memory allocation error\n");
-	/* 
+	/*
 	 * ptr is a 2-d array with each row of possibly different
 	 * length. the size of each row is stored in its first element.
 	 * here, it is basically the mapping between 'flp' to 'grid'
@@ -522,11 +516,11 @@ flp_t *flp_create_grid(flp_t *flp, int ***map)
 	  		fatal("memory allocation error\n");
 	}
 
-	/* 
-	 * now populate the 'grid' blocks and map the blocks 
-	 * from 'flp' to 'grid'. for each block, identify the 
-	 * intervening lines that chop it into grid cells and 
-	 * assign the names of those cells from that of the 
+	/*
+	 * now populate the 'grid' blocks and map the blocks
+	 * from 'flp' to 'grid'. for each block, identify the
+	 * intervening lines that chop it into grid cells and
+	 * assign the names of those cells from that of the
 	 * block
 	 */
 	for(i=0; i < flp->n_units; i++) {
@@ -583,7 +577,7 @@ flp_t *flp_create_grid(flp_t *flp, int ***map)
 		(*map) = ptr;
 	else
 		free_blkgrid_map(flp, ptr);
-	
+
 	return grid;
 }
 
@@ -610,15 +604,15 @@ void xlate_power_blkgrid(flp_t *flp, flp_t *grid, \
 								grid->units[map[i][p]].width * grid->units[map[i][p]].height;
 }
 
-/* 
- * wrap the L2 around this floorplan. L2's area information 
+/*
+ * wrap the L2 around this floorplan. L2's area information
  * is obtained from flp_desc. memory for L2 and its arms has
- * already been allocated in the flp. note that flp & flp_desc 
+ * already been allocated in the flp. note that flp & flp_desc
  * have L2 hidden beyond the boundary at this point
  */
 void flp_wrap_l2(flp_t *flp, flp_desc_t *flp_desc)
 {
-	/* 
+	/*
 	 * x is the width of the L2 arms
 	 * y is the height of the bottom portion
 	 */
@@ -632,28 +626,28 @@ void flp_wrap_l2(flp_t *flp, flp_desc_t *flp_desc)
 	/* flp_desc has L2 hidden beyond the boundary	*/
 	l2_area = flp_desc->units[flp_desc->n_units].area;
 	total_side = sqrt(core_area + l2_area);
-	/* 
-	 * width of the total chip after L2 wrapping is equal to 
+	/*
+	 * width of the total chip after L2 wrapping is equal to
 	 * the width of the core plus the width of the two arms
 	 */
 	x = (total_side - core_width) / 2.0;
 	y = total_side - core_height;
-	/* 
-	 * we are trying to solve the equation 
-	 * (2*x+core_width) * (y+core_height) 
+	/*
+	 * we are trying to solve the equation
+	 * (2*x+core_width) * (y+core_height)
 	 * = l2_area + core_area
-	 * for x and y. it is possible that the values 
+	 * for x and y. it is possible that the values
 	 * turnout to be negative if we restrict the
 	 * total chip to be a square. in that case,
 	 * theoretically, any value of x in the range
-	 * (0, l2_area/(2*core_height)) and the 
+	 * (0, l2_area/(2*core_height)) and the
 	 * corresponding value of y or any value of y
 	 * in the range (0, l2_area/core_width) and the
 	 * corresponding value of x would be a solution
-	 * we look for a solution with a reasonable 
+	 * we look for a solution with a reasonable
 	 * aspect ratio. i.e., we constrain kx = y (or
-	 * ky = x  depending on the aspect ratio of the 
-	 * core) where k = WRAP_L2_RATIO. solving the equation 
+	 * ky = x  depending on the aspect ratio of the
+	 * core) where k = WRAP_L2_RATIO. solving the equation
 	 * with this constraint, we get the following
 	 */
 	if ( x <= 0 || y <= 0.0) {
@@ -669,14 +663,14 @@ void flp_wrap_l2(flp_t *flp, flp_desc_t *flp_desc)
 		}
 		total_side = 2 * x + core_width;
 	}
-	
+
 	/* fix the positions of core blocks	*/
 	flp_translate(flp, x, y);
 
 	/* restore the L2 blocks	*/
 	flp->n_units += (L2_ARMS+1);
 	/* copy L2 info again from flp_desc but from beyond the boundary	*/
-	copy_l2_info(flp, flp->n_units-L2_ARMS-1, flp_desc, 
+	copy_l2_info(flp, flp->n_units-L2_ARMS-1, flp_desc,
 				 flp_desc->n_units, flp_desc->n_units);
 
 	/* fix the positions of the L2  blocks. connectivity
@@ -725,7 +719,7 @@ int flp_wrap_rim(flp_t *flp, double rim_thickness)
 
 		/* block is on the western border	*/
 		if (eq(unit->leftx, rim_thickness)) {
-			sprintf(flp->units[n+j].name, "%s_%s", 
+			sprintf(flp->units[n+j].name, "%s_%s",
 					RIM_LEFT_STR, unit->name);
 			flp->units[n+j].width = rim_thickness;
 			flp->units[n+j].height = unit->height;
@@ -739,7 +733,7 @@ int flp_wrap_rim(flp_t *flp, double rim_thickness)
 
 		/* block is on the eastern border	*/
 		if (eq(unit->leftx + unit->width, width-rim_thickness)) {
-			sprintf(flp->units[n+j].name, "%s_%s", 
+			sprintf(flp->units[n+j].name, "%s_%s",
 					RIM_RIGHT_STR, unit->name);
 			flp->units[n+j].width = rim_thickness;
 			flp->units[n+j].height = unit->height;
@@ -749,13 +743,13 @@ int flp_wrap_rim(flp_t *flp, double rim_thickness)
 			if (eq(unit->bottomy, rim_thickness)) {
 				flp->units[n+j].height += rim_thickness;
 				flp->units[n+j].bottomy = 0;
-			}	
+			}
 			j++;
 		}
 
 		/* block is on the northern border 	*/
 		if (eq(unit->bottomy + unit->height, height-rim_thickness)) {
-			sprintf(flp->units[n+j].name, "%s_%s", 
+			sprintf(flp->units[n+j].name, "%s_%s",
 					RIM_TOP_STR, unit->name);
 			flp->units[n+j].width = unit->width;
 			flp->units[n+j].height = rim_thickness;
@@ -769,7 +763,7 @@ int flp_wrap_rim(flp_t *flp, double rim_thickness)
 
 		/* block is on the southern border	*/
 		if (eq(unit->bottomy, rim_thickness)) {
-			sprintf(flp->units[n+j].name, "%s_%s", 
+			sprintf(flp->units[n+j].name, "%s_%s",
 					RIM_BOTTOM_STR, unit->name);
 			flp->units[n+j].width = unit->width;
 			flp->units[n+j].height = rim_thickness;
@@ -779,10 +773,10 @@ int flp_wrap_rim(flp_t *flp, double rim_thickness)
 			if (eq(unit->leftx, rim_thickness)) {
 				flp->units[n+j].width += rim_thickness;
 				flp->units[n+j].leftx = 0;
-			}	
+			}
 			j++;
 		}
-	}	
+	}
 
 	flp->n_units += j;
 
@@ -794,13 +788,13 @@ int flp_wrap_rim(flp_t *flp, double rim_thickness)
 	return j;
 }
 
-/* 
+/*
  * floorplanning using simulated annealing.
  * precondition: flp is a pre-allocated placeholder.
  * returns the number of compacted blocks in the selected
  * floorplan
  */
-int floorplan(flp_t *flp, flp_desc_t *flp_desc, 
+int floorplan(flp_t *flp, flp_desc_t *flp_desc,
 			  RC_model_t *model, double *power)
 {
 	NPE_t *expr, *next, *best;	/* Normalized Polish Expressions */
@@ -819,7 +813,7 @@ int floorplan(flp_t *flp, flp_desc_t *flp_desc,
 	/* shortcut	*/
 	flp_config_t cfg = flp_desc->config;
 
-	/* 
+	/*
 	 * make the rim strips disappear for slicing tree
 	 * purposes. can be restored at the end
 	 */
@@ -828,7 +822,7 @@ int floorplan(flp_t *flp, flp_desc_t *flp_desc,
 
 	/* wrap L2 around?	*/
 	wrap_l2 = FALSE;
-	if (cfg.wrap_l2 && 
+	if (cfg.wrap_l2 &&
 		!strcasecmp(flp_desc->units[flp_desc->n_units-1].name, cfg.l2_label)) {
 		wrap_l2 = TRUE;
 		/* make L2 disappear too */
@@ -840,7 +834,7 @@ int floorplan(flp_t *flp, flp_desc_t *flp_desc,
 	expr = NPE_get_initial(flp_desc);
 	stack = new_tree_node_stack();
 	init_rand();
-	
+
 	/* convert NPE to flp	*/
 	root = tree_from_NPE(flp_desc, stack, expr);
 	/* compacts too small dead blocks	*/
@@ -855,7 +849,7 @@ int floorplan(flp_t *flp, flp_desc_t *flp_desc,
 
 	resize_thermal_model(model, flp->n_units);
 	#if VERBOSE > 2
-	print_flp(flp);
+	print_flp(flp, TRUE);
 	#endif
 	cost = flp_evaluate_metric(flp, model, tpower, cfg.lambdaA, cfg.lambdaT, cfg.lambdaW);
 	/* restore the compacted blocks	*/
@@ -868,7 +862,7 @@ int floorplan(flp_t *flp, flp_desc_t *flp_desc,
 	steps = 0;
 	/* initial annealing temperature	*/
 	T = -cfg.Davg / log(cfg.P0);
-	/* 
+	/*
 	 * final annealing temperature - we stop when there
 	 * are fewer than (1-cfg.Rreject) accepts.
 	 * of those accepts, assuming half are uphill moves,
@@ -880,13 +874,13 @@ int floorplan(flp_t *flp, flp_desc_t *flp_desc,
 	#if VERBOSE > 0
 	fprintf(stdout, "initial cost: %g\tinitial T: %g\tfinal T: %g\n", cost, T, Tcold);
 	#endif
-	/* 
+	/*
 	 * stop annealing if temperature has cooled down enough or
 	 * max no. of iterations have been tried
 	 */
 	while (T >= Tcold && steps < cfg.Nmax) {
 		/* shortcut	*/
-		n = cfg.Kmoves * flp->n_units; 
+		n = cfg.Kmoves * flp->n_units;
 		i = downs = rejects = 0;
 		sum_cost = 0;
 		/* try enough total or downhill moves per T */
@@ -906,13 +900,13 @@ int floorplan(flp_t *flp, flp_desc_t *flp_desc,
 
 			resize_thermal_model(model, flp->n_units);
 			#if VERBOSE > 2
-			print_flp(flp);
+			print_flp(flp, TRUE);
 			#endif
 			new_cost = flp_evaluate_metric(flp, model, tpower, cfg.lambdaA, cfg.lambdaT, cfg.lambdaW);
 			restore_dead_blocks(flp, flp_desc, compacted, wrap_l2, cfg.model_rim, rim_blocks);
 
 			#if VERBOSE > 1
-			fprintf(stdout, "count: %d\tdowns: %d\tcost: %g\t", 
+			fprintf(stdout, "count: %d\tdowns: %d\tcost: %g\t",
 					i, downs, new_cost);
 			#endif
 
@@ -950,10 +944,10 @@ int floorplan(flp_t *flp, flp_desc_t *flp_desc,
 			i++;
 		}
 		#if VERBOSE > 0
-		fprintf(stdout, "step: %d\tT: %g\ttries: %d\taccepts: %d\trejects: %d\t", 
+		fprintf(stdout, "step: %d\tT: %g\ttries: %d\taccepts: %d\trejects: %d\t",
 				steps, T, i, (i-rejects), rejects);
-		fprintf(stdout, "avg. cost: %g\tbest cost: %g\n", 
-		 		(i-rejects)?(sum_cost / (i-rejects)):sum_cost, best_cost); 
+		fprintf(stdout, "avg. cost: %g\tbest cost: %g\n",
+		 		(i-rejects)?(sum_cost / (i-rejects)):sum_cost, best_cost);
 		#endif
 
 		/* stop annealing if there are too little accepts */
@@ -962,7 +956,7 @@ int floorplan(flp_t *flp, flp_desc_t *flp_desc,
 
 		/* annealing schedule	*/
 		T *= cfg.Rcool;
-		steps++;	
+		steps++;
 	}
 
 	/* best floorplan found	*/
@@ -971,7 +965,7 @@ int floorplan(flp_t *flp, flp_desc_t *flp_desc,
 	{
 		int pos = min_area_pos(root->curve);
 		print_tree_relevant(root, pos, flp_desc);
-	}	
+	}
 	#endif
 	compacted = tree_to_flp(root, flp, TRUE, cfg.compact_ratio);
 	/* update the power vector according to the compaction	*/
@@ -986,7 +980,7 @@ int floorplan(flp_t *flp, flp_desc_t *flp_desc,
 		rim_blocks = flp_wrap_rim(flp, cfg.rim_thickness);
 	resize_thermal_model(model, flp->n_units);
 	#if VERBOSE > 2
-	print_flp(flp);
+	print_flp(flp, TRUE);
 	#endif
 
 	free_NPE(expr);
@@ -994,17 +988,17 @@ int floorplan(flp_t *flp, flp_desc_t *flp_desc,
 	free_tree_node_stack(stack);
 	free_dvector(tpower);
 
-	/* 
+	/*
 	 * return the number of blocks compacted finally
 	 * so that any deallocator can take care of memory
-	 * accordingly. 
+	 * accordingly.
 	 */
 	return (original_n - flp->n_units);
 }
 
 /* functions duplicated from flp_desc.c */
-/* 
- * find the number of units from the 
+/*
+ * find the number of units from the
  * floorplan file
  */
 int flp_count_units(FILE *fp)
@@ -1022,21 +1016,21 @@ int flp_count_units(FILE *fp)
 		if (feof(fp))
 			break;
 		strcpy(str2, str1);
-		
+
 		/* ignore comments and empty lines	*/
 		ptr = strtok(str1, " \r\t\n");
 		if (!ptr || ptr[0] == '#')
 			continue;
 
 		/* functional block placement information	*/
-		if (sscanf(str2, "%s%lf%lf%lf%lf%lf%lf", name, &leftx, &bottomy,		
+		if (sscanf(str2, "%s%lf%lf%lf%lf%lf%lf", name, &leftx, &bottomy,
 		  		   &width, &height, &cp, &res) > 4)
 			count++;
 	}
 	return count;
 }
 
-flp_t *flp_alloc_init_mem(int count)
+flp_t *flp_alloc_init_mem(int count, int use_wire_density)
 {
 	int i;
 	flp_t *flp;
@@ -1044,16 +1038,20 @@ flp_t *flp_alloc_init_mem(int count)
 	if(!flp)
 		fatal("memory allocation error\n");
 	flp->units = (unit_t *) calloc(count, sizeof(unit_t));
-	flp->wire_density = (double **) calloc(count, sizeof(double *));
-	if (!flp->units || !flp->wire_density)
-		fatal("memory allocation error\n");
-	flp->n_units = count;
+  if(!flp->units)
+    fatal("memory allocation error\n");
+  if(use_wire_density) {
+    flp->wire_density = (double **) calloc(count, sizeof(double *));
+	   if (!flp->wire_density)
+		   fatal("memory allocation error\n");
 
-	for (i=0; i < count; i++) {
-	  flp->wire_density[i] = (double *) calloc(count, sizeof(double));
-	  if (!flp->wire_density[i])
-	  	fatal("memory allocation error\n");
-	}
+   for (i=0; i < count; i++) {
+     flp->wire_density[i] = (double *) calloc(count, sizeof(double));
+ 	  if (!flp->wire_density[i])
+ 	  	fatal("memory allocation error\n");
+ 	 }
+  }
+	flp->n_units = count;
 	return flp;
 }
 
@@ -1061,7 +1059,7 @@ flp_t *flp_alloc_init_mem(int count)
 void flp_populate_blks(flp_t *flp, FILE *fp)
 {
 	int i=0;
-	char str[LINE_SIZE], copy[LINE_SIZE]; 
+	char str[LINE_SIZE], copy[LINE_SIZE];
 	char name1[STR_SIZE], name2[STR_SIZE];
 	double width, height, leftx, bottomy, cp, res, temp;
 	double wire_density;
@@ -1081,7 +1079,7 @@ void flp_populate_blks(flp_t *flp, FILE *fp)
 		cp = res = 0.0;
 		if (sscanf(copy, "%s%lf%lf%lf%lf%lf%lf%lf", name1, &width, &height,
 					   &leftx, &bottomy, &cp, &res, &temp) > 7)
-			fatal("invalid floorplan file format\n"); 
+			fatal("invalid floorplan file format\n");
     else if (sscanf(copy, "%s%lf%lf%lf%lf%lf%lf", name1, &width, &height,
 					   &leftx, &bottomy, &cp, &res) == 7)
 		{
@@ -1094,8 +1092,8 @@ void flp_populate_blks(flp_t *flp, FILE *fp)
 				flp->units[i].resistivity = res; //BU_3D set resistivity
 				flp->units[i].hasRes = TRUE;
 				flp->units[i].hasSh = TRUE;
-				i++; 
-		} 
+				i++;
+		}
 		/* Default Option */
 		else if(sscanf(copy, "%s%lf%lf%lf%lf%lf%lf", name1, &width, &height,
 					   &leftx, &bottomy, &cp, &res) == 5)
@@ -1109,11 +1107,11 @@ void flp_populate_blks(flp_t *flp, FILE *fp)
 				flp->units[i].resistivity = 0.0; 	//BU_3D set resistivity to default value 0.0
 				flp->units[i].hasRes = FALSE; 		//BU_3D set boolean for has resistivity flag to false
 				flp->units[i].hasSh = FALSE; 		//BU_3D set boolean for has specific heat flag to false
-				i++; 
+				i++;
 		}
 		/* skip connectivity info	*/
 		else if(sscanf(copy, "%s%s%lf", name1, name2, &wire_density) != 3)
-			fatal("invalid floorplan file format\n"); 
+			fatal("invalid floorplan file format\n");
 	}
 	if (i != flp->n_units)
 	  fatal("mismatch of number of units\n");
@@ -1122,7 +1120,7 @@ void flp_populate_blks(flp_t *flp, FILE *fp)
 /* populate connectivity info	*/
 void flp_populate_connects(flp_t *flp, FILE *fp)
 {
-	char str1[LINE_SIZE], str2[LINE_SIZE]; 
+	char str1[LINE_SIZE], str2[LINE_SIZE];
 	char name1[STR_SIZE], name2[STR_SIZE];
 	/* dummy fields	*/
 	double f1, f2, f3, f4, f5, f6;
@@ -1165,16 +1163,16 @@ void flp_populate_connects(flp_t *flp, FILE *fp)
 				flp->wire_density[x][y] = flp->wire_density[y][x] = wire_density;
 			else if((flp->wire_density[x][y] != flp->wire_density[y][x]) ||
 			        (flp->wire_density[x][y] != wire_density)) {
-				sprintf(str2, "wrong connectivity information for blocks %s and %s\n", 
+				sprintf(str2, "wrong connectivity information for blocks %s and %s\n",
 				        name1, name2);
 				fatal(str2);
 			}
-		} else 
+		} else
 		  	fatal("invalid floorplan file format\n");
 	} /* end while	*/
 }
 
-flp_t *read_flp(char *file, int read_connects)
+flp_t *read_flp(char *file, int read_connects, int initialize_connects)
 {
 	char str[STR_SIZE];
 	FILE *fp;
@@ -1197,7 +1195,7 @@ flp_t *read_flp(char *file, int read_connects)
 		fatal("no units specified in the floorplan file\n");
 
 	/* allocate initial memory */
-	flp = flp_alloc_init_mem(count);
+	flp = flp_alloc_init_mem(count, read_connects || initialize_connects);
 
 	/* 2nd pass - populate block info	*/
 	flp_populate_blks(flp, fp);
@@ -1205,16 +1203,17 @@ flp_t *read_flp(char *file, int read_connects)
 	/* 3rd pass - populate connectivity info    */
 	if (read_connects)
 		flp_populate_connects(flp, fp);
-	/* older version - no connectivity	*/	
-	else for (i=0; i < flp->n_units; i++)
+	/* older version - no connectivity	*/
+	else if(initialize_connects)
+    for (i=0; i < flp->n_units; i++)
 			for (j=0; j < flp->n_units; j++)
 				flp->wire_density[i][j] = 1.0;
 
 	if(fp != stdin)
-		fclose(fp);	
+		fclose(fp);
 
 	/* make sure the origin is (0,0)	*/
-	flp_translate(flp, 0, 0);	
+	flp_translate(flp, 0, 0);
 	return flp;
 }
 
@@ -1228,7 +1227,7 @@ void dump_flp(flp_t *flp, char *file, int dump_connects)
 		fp = stdout;
 	else if (!strcasecmp(file, "stderr"))
 		fp = stderr;
-	else 	
+	else
 		fp = fopen (file, "w");
 
 	if (!fp) {
@@ -1251,19 +1250,21 @@ void dump_flp(flp_t *flp, char *file, int dump_connects)
 					fprintf(fp, "%s\t%s\t%.3f\n", flp->units[i].name,
 							flp->units[j].name, flp->wire_density[i][j]);
 	}
-	
+
 	if(fp != stdout && fp != stderr)
 		fclose(fp);
 }
 
-void free_flp(flp_t *flp, int compacted)
+void free_flp(flp_t *flp, int compacted, int free_connects)
 {
 	int i;
-	for (i=0; i < flp->n_units + compacted; i++) {
-		free(flp->wire_density[i]);
-	}
+  if(free_connects) {
+  	for (i=0; i < flp->n_units + compacted; i++) {
+  		free(flp->wire_density[i]);
+  	}
+    free(flp->wire_density);
+  }
 	free(flp->units);
-	free(flp->wire_density);
 	free(flp);
 }
 
@@ -1278,8 +1279,8 @@ void print_flp_fig (flp_t *flp)
 		bottomy = flp->units[i].bottomy;
 		rightx = flp->units[i].leftx + flp->units[i].width;
 		topy = flp->units[i].bottomy + flp->units[i].height;
-		fprintf(stdout, "%.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f\n", 
-			    leftx, bottomy, leftx, topy, rightx, topy, rightx, bottomy, 
+		fprintf(stdout, "%.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f %.5f\n",
+			    leftx, bottomy, leftx, topy, rightx, topy, rightx, bottomy,
 				leftx, bottomy);
 		fprintf(stdout, "%s\n", flp->units[i].name);
 	}
@@ -1287,7 +1288,7 @@ void print_flp_fig (flp_t *flp)
 }
 
 /* debug print	*/
-void print_flp (flp_t *flp)
+void print_flp (flp_t *flp, int print_connects)
 {
 	int i, j;
 
@@ -1304,23 +1305,25 @@ void print_flp (flp_t *flp)
 		bottomy = flp->units[i].bottomy;
 		rightx = flp->units[i].leftx + flp->units[i].width;
 		topy = flp->units[i].bottomy + flp->units[i].height;
-		fprintf(stdout, "%s\t%lg\t%lg\t%lg\t%lg\t%lg\t%lg\t%lg\n", 
+		fprintf(stdout, "%s\t%lg\t%lg\t%lg\t%lg\t%lg\t%lg\t%lg\n",
 			    name, area, width, height, leftx, bottomy, rightx, topy);
 	}
-	fprintf(stdout, "printing connections:\n");
-	for (i=0; i< flp->n_units; i++)
-		for (j=i+1; j < flp->n_units; j++)
-			if (flp->wire_density[i][j])
-				fprintf(stdout, "%s\t%s\t%lg\n", flp->units[i].name, 
-						flp->units[j].name, flp->wire_density[i][j]);
+  if(print_connects) {
+  	fprintf(stdout, "printing connections:\n");
+  	for (i=0; i< flp->n_units; i++)
+  		for (j=i+1; j < flp->n_units; j++)
+  			if (flp->wire_density[i][j])
+  				fprintf(stdout, "%s\t%s\t%lg\n", flp->units[i].name,
+  						flp->units[j].name, flp->wire_density[i][j]);
+  }
 }
 
 /* print the statistics about this floorplan.
- * note that connects_file is NULL if wire 
- * information is already populated	
+ * note that connects_file is NULL if wire
+ * information is already populated
  */
-void print_flp_stats(flp_t *flp, RC_model_t *model, 
-					 char *l2_label, char *power_file, 
+void print_flp_stats(flp_t *flp, RC_model_t *model,
+					 char *l2_label, char *power_file,
 					 char *connects_file)
 {
 	double core, total, occupied;	/* area	*/
@@ -1388,7 +1391,7 @@ int get_blk_index(flp_t *flp, char *name)
 		fatal("null pointer in get_blk_index\n");
 
 	for (i = 0; i < flp->n_units; i++) {
-		if (!strcasecmp(name, flp->units[i].name)) {
+    if (!strcasecmp(name, flp->units[i].name)) {
 			return i;
 		}
 	}
@@ -1403,7 +1406,7 @@ int is_horiz_adj(flp_t *flp, int i, int j)
 	double x1, x2, x3, x4;
 	double y1, y2, y3, y4;
 
-	if (i == j) 
+	if (i == j)
 		return FALSE;
 
 	x1 = flp->units[i].leftx;
@@ -1475,7 +1478,7 @@ double get_shared_len(flp_t *flp, int i, int j)
 	double p11, p12, p21, p22;
 	p11 = p12 = p21 = p22 = 0.0;
 
-	if (i==j) 
+	if (i==j)
 		return FALSE;
 
 	if (is_horiz_adj(flp, i, j)) {
@@ -1496,11 +1499,11 @@ double get_shared_len(flp_t *flp, int i, int j)
 }
 
 double get_total_width(flp_t *flp)
-{	
+{
 	int i;
 	double min_x = flp->units[0].leftx;
 	double max_x = flp->units[0].leftx + flp->units[0].width;
-	
+
 	for (i=1; i < flp->n_units; i++) {
 		if (flp->units[i].leftx < min_x)
 			min_x = flp->units[i].leftx;
@@ -1512,11 +1515,11 @@ double get_total_width(flp_t *flp)
 }
 
 double get_total_height(flp_t *flp)
-{	
+{
 	int i;
 	double min_y = flp->units[0].bottomy;
 	double max_y = flp->units[0].bottomy + flp->units[0].height;
-	
+
 	for (i=1; i < flp->n_units; i++) {
 		if (flp->units[i].bottomy < min_y)
 			min_y = flp->units[i].bottomy;
@@ -1531,7 +1534,7 @@ double get_minx(flp_t *flp)
 {
 	int i;
 	double min_x = flp->units[0].leftx;
-	
+
 	for (i=1; i < flp->n_units; i++)
 		if (flp->units[i].leftx < min_x)
 			min_x = flp->units[i].leftx;
@@ -1543,7 +1546,7 @@ double get_miny(flp_t *flp)
 {
 	int i;
 	double min_y = flp->units[0].bottomy;
-	
+
 	for (i=1; i < flp->n_units; i++)
 		if (flp->units[i].bottomy < min_y)
 			min_y = flp->units[i].bottomy;
@@ -1557,7 +1560,7 @@ double get_core_width(flp_t *flp, char *l2_label)
 	int i;
 	double min_x = LARGENUM;
 	double max_x = -LARGENUM;
-	
+
 	for (i=0; i < flp->n_units; i++) {
 		/* core is that part of the chip excluding the l2 and rim	*/
 		if (strstr(flp->units[i].name, l2_label) != flp->units[i].name &&
@@ -1566,7 +1569,7 @@ double get_core_width(flp_t *flp, char *l2_label)
 				min_x = flp->units[i].leftx;
 			if (flp->units[i].leftx + flp->units[i].width > max_x)
 				max_x = flp->units[i].leftx + flp->units[i].width;
-		}		
+		}
 	}
 
 	return (max_x - min_x);
@@ -1574,11 +1577,11 @@ double get_core_width(flp_t *flp, char *l2_label)
 
 /* precondition: L2 should have been wrapped around	*/
 double get_core_height(flp_t *flp, char *l2_label)
-{	
+{
 	int i;
 	double min_y = LARGENUM;
 	double max_y = -LARGENUM;
-	
+
 	for (i=0; i < flp->n_units; i++) {
 		/* core is that part of the chip excluding the l2 and rim	*/
 		if (strstr(flp->units[i].name, l2_label) != flp->units[i].name &&
@@ -1587,7 +1590,7 @@ double get_core_height(flp_t *flp, char *l2_label)
 				min_y = flp->units[i].bottomy;
 			if (flp->units[i].bottomy + flp->units[i].height > max_y)
 				max_y = flp->units[i].bottomy + flp->units[i].height;
-		}		
+		}
 	}
 
 	return (max_y - min_y);
@@ -1599,7 +1602,7 @@ double get_total_area(flp_t *flp)
 	double area = 0.0;
 	for(i=0; i < flp->n_units; i++)
 		area += flp->units[i].width * flp->units[i].height;
-	return area;	
+	return area;
 }
 
 double get_core_area(flp_t *flp, char *l2_label)
@@ -1610,7 +1613,7 @@ double get_core_area(flp_t *flp, char *l2_label)
 		if (strstr(flp->units[i].name, l2_label) != flp->units[i].name &&
 			strstr(flp->units[i].name, RIM_PREFIX) != flp->units[i].name)
 			area += flp->units[i].width * flp->units[i].height;
-	return area;		
+	return area;
 }
 
 /* excluding the dead blocks	*/
@@ -1619,7 +1622,7 @@ double get_core_occupied_area(flp_t *flp, char *l2_label)
 	int i, num;
 	double dead_area = 0.0;
 	for(i=0; i < flp->n_units; i++) {
-		/* 
+		/*
 		 * there can be a max of n-1 dead blocks where n is the
 		 * number of non-dead blocks (since each cut, vertical
 		 * or horizontal, can correspond to a maximum of one
@@ -1628,8 +1631,8 @@ double get_core_occupied_area(flp_t *flp, char *l2_label)
 		if ((sscanf(flp->units[i].name, DEAD_PREFIX"%d", &num) == 1) &&
 			(num < (flp->n_units-1) / 2))
 			dead_area += flp->units[i].width * flp->units[i].height;
-	}		
-	return get_core_area(flp, l2_label) - dead_area;	
+	}
+	return get_core_area(flp, l2_label) - dead_area;
 }
 
 double get_wire_metric(flp_t *flp)
@@ -1643,7 +1646,7 @@ double get_wire_metric(flp_t *flp)
 				dist = get_manhattan_dist(flp, i, j);
 				w += flp->wire_density[i][j] * dist;
 			}
-	return w;		
+	return w;
 }
 
 double get_manhattan_dist(flp_t *flp, int i, int j)

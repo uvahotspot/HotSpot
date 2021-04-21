@@ -1,6 +1,6 @@
-/* 
+/*
  * A dummy simulator template file to illustrate the use of
- * HotSpot in a cycle-accurate simulator like Simplescalar. 
+ * HotSpot in a cycle-accurate simulator like Simplescalar.
  * This file contains the following sample routines:
  * 	a) Model initialization	(sim_init)
  *	b) Model use in a cycle-by-cycle power model (sim_main)
@@ -34,12 +34,12 @@ static double *overall_power, *steady_temp;
 void sim_init()
 {
 	/* initialize flp, get adjacency matrix */
-	flp = read_flp(flp_file, FALSE);
+	flp = read_flp(flp_file, FALSE, FALSE);
 
-	/* 
-	 * configure thermal model parameters. default_thermal_config 
+	/*
+	 * configure thermal model parameters. default_thermal_config
 	 * returns a set of default parameters. only those configuration
-	 * parameters (config.*) that need to be changed are set explicitly. 
+	 * parameters (config.*) that need to be changed are set explicitly.
 	 */
 	thermal_config_t config = default_thermal_config();
 	strcpy(config.init_file, init_file);
@@ -47,17 +47,17 @@ void sim_init()
 
 	/* default_thermal_config selects block model as the default.
 	 * in case grid model is needed, select it explicitly and
-	 * set the grid model parameters (grid_rows, grid_cols, 
+	 * set the grid model parameters (grid_rows, grid_cols,
 	 * grid_steady_file etc.) appropriately. for e.g., in the
-	 * following commented line, we just choose the grid model 
-	 * and let everything else to be the default. 
+	 * following commented line, we just choose the grid model
+	 * and let everything else to be the default.
 	 * NOTE: for modeling 3-D chips, it is essential to set
 	 * the layer configuration file (grid_layer_file) parameter.
 	 */
 	/* strcpy(config->model_type, GRID_MODEL_STR); */
 
 	/* allocate and initialize the RC model	*/
-	model = alloc_RC_model(&config, flp);
+  alloc_RC_model(&config, flp, NULL, NULL, FALSE, FALSE);
 	populate_R_model(model, flp);
 	populate_C_model(model, flp);
 
@@ -67,7 +67,7 @@ void sim_init()
 	power = hotspot_vector(model);
 	steady_temp = hotspot_vector(model);
 	overall_power = hotspot_vector(model);
-	
+
 	/* set up initial instantaneous temperatures */
 	if (strcmp(model->config->init_file, NULLFILE)) {
 		if (!model->config->dtm_used)	/* initial T = steady T for no DTM	*/
@@ -79,10 +79,10 @@ void sim_init()
 		set_temp(model, temp, model->config->init_temp);
 }
 
-/* 
- * sample routine to illustrate the possible use of hotspot in a 
- * cycle-by-cycle power model. note that this is just a stub 
- * function and is not called anywhere in this file	
+/*
+ * sample routine to illustrate the possible use of hotspot in a
+ * cycle-by-cycle power model. note that this is just a stub
+ * function and is not called anywhere in this file
  */
 void sim_main()
 {
@@ -91,14 +91,14 @@ void sim_main()
 	int i, j, base, idx;
 
 	/* the main simulator loop */
-	while (1) {
+	while (TRUE) {
 		/* set the per cycle power values as returned by Wattch/power simulator	*/
 		if (model->type == BLOCK_MODEL) {
 			power[get_blk_index(flp, "Icache")] +=  0;	/* set the power numbers instead of '0'	*/
-			power[get_blk_index(flp, "Dcache")] +=  0;	
-			power[get_blk_index(flp, "Bpred")] +=  0;	
+			power[get_blk_index(flp, "Dcache")] +=  0;
+			power[get_blk_index(flp, "Bpred")] +=  0;
 			/* ... more functional units ...	*/
-		
+
 		/* for the grid model, set the power numbers for all power dissipating layers	*/
 		} else
 			for(i=0, base=0; i < model->grid->n_layers; i++) {
@@ -111,8 +111,8 @@ void sim_main()
 					power[base+idx] += 0;
 					/* ... more functional units ...	*/
 
-				}	
-				base += model->grid->layers[i].flp->n_units;	
+				}
+				base += model->grid->layers[i].flp->n_units;
 			}
 
 		/* call compute_temp at regular intervals */
@@ -125,13 +125,13 @@ void sim_main()
 				for (i = 0; i < flp->n_units; i++) {
 					/* for steady state temperature calculation	*/
 					overall_power[i] += power[i];
-					/* 
-					 * 'power' array is an aggregate of per cycle numbers over 
-					 * the sampling_intvl. so, compute the average power 
+					/*
+					 * 'power' array is an aggregate of per cycle numbers over
+					 * the sampling_intvl. so, compute the average power
 					 */
 					power[i] /= (elapsed_time * model->config->base_proc_freq);
 				}
-			/* for the grid model, account for all the power dissipating layers	*/	
+			/* for the grid model, account for all the power dissipating layers	*/
 			} else
 				for(i=0, base=0; i < model->grid->n_layers; i++) {
 					if(model->grid->layers[i].has_power)
@@ -145,21 +145,21 @@ void sim_main()
 				}
 
 			/* calculate the current temp given the previous temp, time
-			 * elapsed since then, and the average power dissipated during 
-			 * that interval. for the grid model, only the first call to 
-			 * compute_temp passes a non-null 'temp' array. if 'temp' is  NULL, 
-			 * compute_temp remembers it from the last non-null call. 
-			 * this is used to maintain the internal grid temperatures 
+			 * elapsed since then, and the average power dissipated during
+			 * that interval. for the grid model, only the first call to
+			 * compute_temp passes a non-null 'temp' array. if 'temp' is  NULL,
+			 * compute_temp remembers it from the last non-null call.
+			 * this is used to maintain the internal grid temperatures
 			 * across multiple calls of compute_temp
 			 */
 			if (model->type == BLOCK_MODEL || first_call)
 				compute_temp(model, power, temp, elapsed_time);
 			else
 				compute_temp(model, power, NULL, elapsed_time);
-			
+
 			/* make sure to record the first call	*/
 			first_call = FALSE;
-	
+
 			/* reset the power array */
 			if (model->type == BLOCK_MODEL)
 				for (i = 0; i < flp->n_units; i++)
@@ -175,10 +175,10 @@ void sim_main()
 	}
 }
 
-/* 
- * sample uninitialization routine to illustrate the possible use of hotspot in a 
- * cycle-by-cycle power model. note that this is just a stub 
- * function and is not called anywhere in this file	
+/*
+ * sample uninitialization routine to illustrate the possible use of hotspot in a
+ * cycle-by-cycle power model. note that this is just a stub
+ * function and is not called anywhere in this file
  */
 void sim_exit()
 {
@@ -189,7 +189,7 @@ void sim_exit()
 	if (model->type == BLOCK_MODEL)
 		for (i = 0; i < flp->n_units; i++)
 			overall_power[i] /= total_elapsed_cycles;
-	else		
+	else
 		for(i=0, base=0; i < model->grid->n_layers; i++) {
 			if(model->grid->layers[i].has_power)
 				for(j=0; j < model->grid->layers[i].flp->n_units; j++)
@@ -204,8 +204,8 @@ void sim_exit()
 	if (strcmp(model->config->steady_file, NULLFILE))
 		dump_temp(model, steady_temp, model->config->steady_file);
 
-	/* for the grid model, optionally dump the internal 
-	 * temperatures of the grid cells	
+	/* for the grid model, optionally dump the internal
+	 * temperatures of the grid cells
 	 */
 	if (model->type == GRID_MODEL &&
 		strcmp(model->config->grid_steady_file, NULLFILE))
@@ -213,7 +213,7 @@ void sim_exit()
 
 	/* cleanup */
 	delete_RC_model(model);
-	free_flp(flp, FALSE);
+	free_flp(flp, FALSE, FALSE);
 	free_dvector(temp);
 	free_dvector(power);
 	free_dvector(steady_temp);

@@ -1,8 +1,8 @@
-/* 
- * HotFloorplan is a temperature-aware floorplanning tool 
- * that can be easily modified to optimize for any arbitrary 
+/*
+ * HotFloorplan is a temperature-aware floorplanning tool
+ * that can be easily modified to optimize for any arbitrary
  * metric. This program reads in a floorplan description
- * file that has the area, aspect ratio and connectivity 
+ * file that has the area, aspect ratio and connectivity
  * information of a set of functional blocks. It also reads
  * in a file with the average power dissipation values for
  * those blocks and outputs the best floorplan it can find
@@ -19,6 +19,7 @@
 
 #include "flp.h"
 #include "temperature.h"
+#include "materials.h"
 #include "wire.h"
 #include "util.h"
 #include "hotfloorplan.h"
@@ -37,7 +38,7 @@ void usage(int argc, char **argv)
 	fprintf(stdout, "           \toverride the options from config file\n");
 }
 
-/* 
+/*
  * parse a table of name-value string pairs and add the configuration
  * parameters to 'config'
  */
@@ -74,9 +75,15 @@ void global_config_from_strs(global_config_t *config, str_pair *table, int size)
 	} else {
 		strcpy(config->dump_config, NULLFILE);
 	}
+  if ((idx = get_str_index(table, size, "materials_file")) >= 0) {
+      if(sscanf(table[idx].value, "%s", config->materials_file) != 1)
+        fatal("invalid format for configuration parameter materials_file\n");
+  } else {
+      strcpy(config->materials_file, NULLFILE);
+  }
 }
 
-/* 
+/*
  * convert config into a table of name-value pairs. returns the no.
  * of parameters converted
  */
@@ -108,11 +115,11 @@ void print_wire_delays(flp_t *flp, double frequency)
 	fprintf(stdout, "(in %.1f GHz cycles)\n", frequency / 1.0e9);
 	fprintf(stdout, "name1\tname2\tglobal\tintermediate\n");
 	for (i=0; i < flp->n_units-1; i++)
-		for (j=i+1; j < flp->n_units; j++) 
+		for (j=i+1; j < flp->n_units; j++)
 			if (flp->wire_density[i][j]) {
 				delay_g = wire_length2delay(get_manhattan_dist(flp, i, j), WIRE_GLOBAL);
 				delay_i = wire_length2delay(get_manhattan_dist(flp, i, j), WIRE_INTER);
-				fprintf(stdout, "%s\t%s\t%.3f\t%.3f\n", flp->units[i].name, flp->units[j].name, 
+				fprintf(stdout, "%s\t%s\t%.3f\t%.3f\n", flp->units[i].name, flp->units[j].name,
 						frequency * delay_g, frequency * delay_i);
 			}
 }
@@ -127,6 +134,7 @@ int main(int argc, char **argv)
 	thermal_config_t thermal_config;
 	flp_config_t flp_config;
 	global_config_t global_config;
+  materials_list_t materials_list;
 	str_pair table[MAX_ENTRIES];
 	int size, compacted;
 
@@ -134,7 +142,7 @@ int main(int argc, char **argv)
 		usage(argc, argv);
 		return 1;
 	}
-	
+
 	size = parse_cmdline(table, MAX_ENTRIES, argc, argv);
 	global_config_from_strs(&global_config, table, size);
 
@@ -142,17 +150,23 @@ int main(int argc, char **argv)
 	if (strcmp(global_config.config, NULLFILE))
 		size += read_str_pairs(&table[size], MAX_ENTRIES, global_config.config);
 
-	/* 
+	/*
 	 * in the str_pair 'table', earlier entries override later ones.
-	 * so, command line options have priority over config file 
+	 * so, command line options have priority over config file
 	 */
 	size = str_pairs_remove_duplicates(table, size);
+
+  // fill in material properties
+  default_materials(&materials_list);
+  if(strncmp(global_config.materials_file, NULLFILE, STR_SIZE)) {
+    materials_add_from_file(&materials_list, global_config.materials_file);
+  }
 
 	/* get defaults */
 	thermal_config = default_thermal_config();
 	flp_config = default_flp_config();
 	/* modify according to command line / config file	*/
-	thermal_config_add_from_strs(&thermal_config, table, size);
+	thermal_config_add_from_strs(&thermal_config, &materials_list, table, size);
 	flp_config_add_from_strs(&flp_config, table, size);
 
 	/* dump configuration if specified	*/
@@ -165,7 +179,7 @@ int main(int argc, char **argv)
 	}
 
 	/* If the grid model is used, things could be really slow!
-	 * Also make sure it is not in the 3-d chip mode (specified 
+	 * Also make sure it is not in the 3-d chip mode (specified
 	 * with the layer configuration file)
 	 */
 	if (!strcmp(thermal_config.model_type, GRID_MODEL_STR)) {
@@ -176,30 +190,30 @@ int main(int argc, char **argv)
 
 	/* description of the functional blocks to be floorplanned	*/
 	flp_desc = read_flp_desc(global_config.flp_desc, &flp_config);
-	/* 
+	/*
 	 * just an empty frame with blocks' names.
 	 * block positions not known yet.
 	 */
 	flp = flp_placeholder(flp_desc);
 	/* temperature model	*/
-	model = alloc_RC_model(&thermal_config, flp, 0);
+	model = alloc_RC_model(&thermal_config, flp, NULL, &materials_list, 0, 0);
 	/* input power vector	*/
 	power = hotspot_vector(model);
 	read_power(model, power, global_config.power_in);
 
 	/* main floorplanning routine	*/
 	compacted = floorplan(flp, flp_desc, model, power);
-	/* 
-	 * print the finally selected floorplan in a format that can 
+	/*
+	 * print the finally selected floorplan in a format that can
 	 * be understood by tofig.pl (which converts it to a FIG file)
 	 */
 	print_flp_fig(flp);
 	/* print the floorplan statistics	*/
 	if (flp_config.wrap_l2 &&
 		!strcasecmp(flp_desc->units[flp_desc->n_units-1].name, flp_config.l2_label))
-		print_flp_stats(flp, model, flp_config.l2_label, 
+		print_flp_stats(flp, model, flp_config.l2_label,
 						global_config.power_in, global_config.flp_desc);
-	
+
 	/* print the wire delays between blocks	*/
 	print_wire_delays(flp, thermal_config.base_proc_freq);
 
@@ -211,7 +225,7 @@ int main(int argc, char **argv)
 	free_dvector(power);
 
 	/* while deallocating, free the compacted blocks too	*/
-	free_flp(flp, compacted);
+	free_flp(flp, compacted, TRUE);
 
 	return 0;
 }

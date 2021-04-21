@@ -1,0 +1,63 @@
+#Lines starting with # are used for commenting
+#Blank lines are also ignored
+
+#File Format:
+
+#<Layer Number>
+#<Lateral heat flow Y/N?>
+#<Power Dissipation Y/N?>
+#<Specific heat capacity in J/(m^3K)>
+#<Resistivity in (m-K)/W>
+#<Thickness in m>
+#<floorplan file>
+
+#Example
+
+#0
+#Y
+#Y
+#1.75e6
+#0.01
+#0.00015
+#ev6.flp.orig
+
+# Layer 0: Silicon Interposer
+0
+Y
+N
+silicon
+100e-6
+floorplans/interposer.flp
+
+# Layer 1 : Microfluidic Cooling Layer
+1
+Y
+N
+silicon
+100e-6
+microchannel_geometries/horizontal.csv
+
+#Layer 2: Silicon Layer
+2
+Y
+N
+silicon
+90e-6
+floorplans/silicon.flp
+
+# Layer 3: Silicon Heater
+3
+Y
+Y
+1630300
+0.0076923
+10e-6
+floorplans/heater.flp
+
+# Layer 4: DRAM
+4
+Y
+Y
+silicon
+400e-6
+floorplans/DRAM.flp

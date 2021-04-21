@@ -2,13 +2,14 @@
 #define __TEMPERATURE_GRID_H_
 
 /* grid model differs from the block model in its use of
- * a mesh of cells whose resolution is configurable. unlike 
+ * a mesh of cells whose resolution is configurable. unlike
  * the block model, it can also model a stacked 3-D chip,
  * with each layer having a different floorplan. information
  * about the floorplan and the properties of each layer is
- * input in the form of a layer configuration file. 
+ * input in the form of a layer configuration file.
  */
 #include "temperature.h"
+#include "microchannel.h"
 
 #if SUPERLU > 0
 /* Lib for SuperLU */
@@ -29,7 +30,7 @@
 #define V_POWER				0
 #define V_TEMP				1
 
-/* default no. of chip layers (excluding spreader 
+/* default no. of chip layers (excluding spreader
  * and sink). used when LCF file is not specified
  */
 #define DEFAULT_CHIP_LAYERS	2
@@ -57,13 +58,13 @@
 #define OCCUPANCY_THRESHOLD 0.95
 
 /* block list: block to grid mapping data structure.
- * list of blocks mapped to a grid cell	
+ * list of blocks mapped to a grid cell
  */
 typedef struct blist_t_st
 {
   /* index of the mapped block	*/
   int idx;
-  /* ratio of this block's area within the grid cell 
+  /* ratio of this block's area within the grid cell
    * to the total area of the grid cell
    */
   double occupancy;
@@ -97,7 +98,7 @@ typedef struct glist_t_st
 /* one layer of the grid model. a 3-D chip is a stacked
  * set of layers
  */
-typedef struct layer_t_st 
+typedef struct layer_t_st
 {
   /* floorplan */
   flp_t *flp;
@@ -109,6 +110,10 @@ typedef struct layer_t_st
   double k;			/* 1/resistivity	*/
   double thickness;
   double sp;			/* specific heat capacity	*/
+
+  /* microchannel parameters */
+  int is_microchannel; /* is a microchannel layer? */
+  microchannel_config_t *microchannel_config; /* config information if is_microchannel = 1 */
 
   /* extracted information	*/
   double rx, ry, rz;	/* x, y and z resistors	*/
@@ -159,11 +164,11 @@ typedef struct grid_model_t_st
   int c_ready;	/* are the C's initialized?	*/
   int has_lcf;	/* LCF file specified?		*/
 
-  /* internal state - most recently computed 
+  /* internal state - most recently computed
    * steady state temperatures
    */
   grid_model_vector_t *last_steady;
-  /* internal state - most recently computed 
+  /* internal state - most recently computed
    * transient temperatures
    */
   /* grid cell temperatures	*/
@@ -173,14 +178,24 @@ typedef struct grid_model_t_st
 
   /* to allow for resizing	*/
   int base_n_units;
+
+  /* default microchannel config */
+  int use_microchannels;
+  microchannel_config_t *default_microchannel_config;
+
+  /* Variables used in simulation with SuperLU */
+#if SUPERLU > 0
+  SuperMatrix G;
+  diagonal_matrix_t *C;
+#endif
 }grid_model_t;
 
 //BU_3D: Functions used to retrieve data from the det3D_grid_reference structure
 double find_res_3D(int n, int i, int j, grid_model_t *model, int choice);
-double find_cap_3D(int n, int i, int j, grid_model_t *model);	
+double find_cap_3D(int n, int i, int j, grid_model_t *model);
 /* constructor/destructor */
-grid_model_t *alloc_grid_model(thermal_config_t *config, flp_t *flp_default, 
-                               int do_detailed_3D);//BU_3D: added do_detailed_3D
+grid_model_t *alloc_grid_model(thermal_config_t *config, flp_t *flp_default, microchannel_config_t *microchannel_config,
+  materials_list_t *materials_list, int do_detailed_3D, int use_microchannels);//BU_3D: added do_detailed_3D
 void delete_grid_model(grid_model_t *model);
 
 /* initialization	*/
@@ -197,14 +212,14 @@ double *hotspot_vector_grid(grid_model_t *model);
  * elements starting at 'at'. useful in floorplan
  * compaction
  */
-void trim_hotspot_vector_grid(grid_model_t *model, double *dst, double *src, 
+void trim_hotspot_vector_grid(grid_model_t *model, double *dst, double *src,
                               int at, int size);
-/* update the model's node count	*/						 
+/* update the model's node count	*/
 void resize_thermal_model_grid(grid_model_t *model, int n_units);
 void set_temp_grid (grid_model_t *model, double *temp, double val);
-void dump_top_layer_temp_grid(grid_model_t *model, char *file, grid_model_vector_t *temp);
 void dump_steady_temp_grid (grid_model_t *model, char *file);
 void dump_temp_grid (grid_model_t *model, double *temp, char *file);
+void dump_transient_temp_grid(grid_model_t *model, int trace_num, double sampling_intvl, char *filename);
 void copy_temp_grid (grid_model_t *model, double *dst, double *src);
 void read_temp_grid (grid_model_t *model, double *temp, char *file, int clip);
 void dump_power_grid(grid_model_t *model, double *power, char *file);
@@ -228,8 +243,14 @@ void debug_print_grid(grid_model_t *model);
 #if SUPERLU > 0
 /* steady-state solver */
 void direct_SLU(grid_model_t *model, grid_model_vector_t *power, grid_model_vector_t *temp);
+
+/* build steady-state matrices */
 SuperMatrix build_steady_grid_matrix(grid_model_t *model);
 SuperMatrix build_steady_rhs_vector(grid_model_t *model, grid_model_vector_t *power, double **rhs);
+
+SuperMatrix build_transient_grid_matrix(grid_model_t *model);
+double *build_transient_power_vector(grid_model_t *model, grid_model_vector_t *power);
+diagonal_matrix_t *build_diagonal_matrix(grid_model_t *model);
 #endif
 
 #endif

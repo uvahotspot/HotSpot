@@ -1,0 +1,85 @@
+i7. HotFloorplan:
+
+a) As mentioned above, one of the inputs to HotFloorplan is a
+   floorplan description file that has information about the
+   blocks to be floorplanned. The maximum aspect ratio constraint is set
+   to 1:3 except when a block has a bigger aspect ratio in the
+   base floorplan. In that case, the block's aspect
+   ratio itself forms the upper limit. Also,
+   the connectivity section of 'ev6.desc' currently lists 13
+   major interconnects that we thought were important at the
+   architecture level. They are assumed to be of equal wire
+   density. Also, the wire_density field of the floorplan
+   description can be used to assign weights for the different
+   wires according to their contribution to performance. In
+   'ev6.desc', the assignment of these weights is uniform
+   across all wires.
+b) HotFloorplan includes a first-order wire-delay model for
+   wires in the global and intermediate metal layers. It is
+   a simple stand-alone model that converts wire length to
+   wire delay and can be used in any tool, whether the thermal
+   model, floorplan model, or any other simulator. It is
+   adapted from Otten and Brayton, DAC'98, and related work.
+   The interfaces for the model are provided 'wire.[ch]'. An
+   appropriate process technology node can be chosen by using
+   the TECHNODE #define in 'wire.h'. After that, the model is
+   a simple call to the function 'wirelength2delay'.
+c) HotFloorplan can be configured through many command line options.
+   The 'hotspot.config' file clearly lists them and what they do.
+   Among the options, following merit further discussion:
+   i) Annealing parameters:
+      The meaning of each of these can be easily obtained from any
+      standard text on VLSI CAD that deals with simulated
+      annealing (e.g.: Sarrafzadeh and Wong, "An Introduction to
+      VLSI Physical Design", McGraw-Hill 1996). The original
+      DAC '86 paper by Wong and Liu on floorplanning is a very good
+      starting point.
+  ii) Compaction ratio:
+      During floorplanning, empty spaces can arise in a floorplan.
+      Sometimes, these spaces are just an artifact of the discrete
+      nature of the aspect ratio function of the individual
+      blocks. Typically, about 50% of the maximum possible number
+      of dead spaces is due to this artifact. Such dead spaces
+      are very tiny and hence can be safely ignored without any
+      impact on the thermal model. In fact, ignoring such blocks
+      reduces the size of the problem input to the thermal solver.
+      Since the thermal model's solver algorithm is a higher order
+      polynomial function in the number of functional blocks,
+      ignoring the tiny blocks improves the performance of the
+      floorplanner significantly. The 'compact_ratio' option
+      sets a threshold on the area of such tiny blocks. The
+      default is 0.5% of the area of the encompassing 'parent
+      rectangle'. So, dead spaces that are smaller than 0.5% of
+      the parent rectangle are ignored during floorplanning. This
+      results in a maximum error in core area of about 0.46% for
+      our experiments. This setting, combined with the 'n_orients'
+      setting that determines the magnitude of discreteness of
+      the blocks' aspect ratio function, can be tuned to manage
+      the trade-off between the speed and accuracy of the
+      floorplanner. It is to be noted that in HotFloorplan, the
+      empty spaces that are not compacted are named in the form
+      _0, _1 and so on. It can be seen that the 'output.flp'
+      generated from the steps discussed above has blocks named
+      in that form.
+ iii) Weights for the metric (objective function):
+      HotFloorplan uses an objective function that is of the form
+      lambdaA * A + lambdaT * T + lambdaW * W where A, T and W are
+      the area, temperature and wire length respectively. The
+      weights lambdaA lambdaT and lambdaW can be set through
+      configuration parameters. Please note that for HotFloorplan,
+      A is in the order or hundreds of mm, T is in the order of
+      hundreds of Kelvin and W is in the order of tens of mm. In
+      combining them to a single metric, the weights have to be
+      assigned in a manner that not only takes into account the
+      desired importance of the variables A, T and W but also
+      compensates for the mismatch in their units of measurement.
+      The default weights in HotFloorplan are chosen based on this
+      principle. If one is interested in objective functions that
+      are not in the above-mentioned form, it is quite easy to
+      make the change in HotFloorplan. The design of the simulated
+      annealing algorithm is such that any arbitrary metric (objective
+      function) can be incorporated. In HotFloorplan, this is done
+      just by changing the return statement of the
+      'flp_evaluate_metric' function at the beginning of 'flp.c' into
+      an appropriate objective function of A, T and W.
+
