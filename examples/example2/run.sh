@@ -4,6 +4,9 @@
 rm -f gcc.init
 rm -f outputs/*
 
+# Create outputs directory if it doesn't exist
+mkdir outputs
+
 # The simulation in `example1` used the fast but less accurate `block`
 # thermal model. HotSpot offers the choice of a more accurate but
 # relatively slower model called the 'grid' model. The '-model_type

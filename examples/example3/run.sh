@@ -4,6 +4,9 @@
 rm -f *.init
 rm -f outputs/*
 
+# Create outputs directory if it doesn't exist
+mkdir outputs
+
 # HotSpot's grid model is capable of modeling stacked 3-D chips. To be
 # able to do that, one has to specify what is called the 'Layer
 # Configuration File' (LCF). An LCF specifies the set of vertical layers
