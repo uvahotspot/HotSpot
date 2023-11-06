@@ -1,0 +1,20 @@
+# ignore compilation outputs
+*.o
+*.obj
+*.d
+core
+hotspot
+hotfloorplan
+libhotspot.a
+
+# ignore edition temporary file
+*.swp
+*~
+
+# special ignore, get it with "make clean" command and can't be classified to above
+Makefile.bak
+
+# ignore example outputs
+examples/*/outputs/
+examples/*/*.init
+examples/example6/output.flp
